@@ -1,0 +1,38 @@
+{
+  "name": "graphium",
+  "version": "1.0.0",
+  "description": "High-performance WebGL2 2D graph visualization library with force-directed layout, edge bundling, and interactive controls",
+  "type": "module",
+  "main": "src/Graphium.js",
+  "module": "src/Graphium.js",
+  "types": "src/Graphium.d.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "graph",
+    "visualization",
+    "webgl",
+    "webgl2",
+    "force-directed",
+    "edge-bundling",
+    "network",
+    "d3-alternative"
+  ],
+  "author": "Yuri",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/Graphium.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/Graphium/issues"
+  },
+  "homepage": "https://github.com/yourusername/Graphium#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
