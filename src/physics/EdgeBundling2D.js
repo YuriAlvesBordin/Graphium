@@ -170,6 +170,8 @@ export class EdgeBundling2D {
     this.bundleIds = new Int32Array(0);
     this.bundleSizes = new Int32Array(0);
     this.highCountEdges = new Uint8Array(0);
+    this.edgeChainIndex = new Int32Array(0);
+    this.edgePairSize = new Int32Array(0);
     this.dirty = false;
     this.routeRevision++;
   }
@@ -178,9 +180,13 @@ export class EdgeBundling2D {
     if (this.pointCounts.length >= count) {
       return;
     }
-    this.pointCounts = new Int32Array(Math.max(count, this.pointCounts.length * 2 || 16));
-    this.bundleIds = new Int32Array(this.pointCounts.length);
-    this.bundleSizes = new Int32Array(this.pointCounts.length);
+    const size = Math.max(count, this.pointCounts.length * 2 || 16);
+    this.pointCounts = new Int32Array(size);
+    this.bundleIds = new Int32Array(size);
+    this.bundleSizes = new Int32Array(size);
+    this.highCountEdges = new Uint8Array(size);
+    this.edgeChainIndex = new Int32Array(size);
+    this.edgePairSize = new Int32Array(size);
   }
 
   _initializeRoutes() {
@@ -492,11 +498,11 @@ export class EdgeBundling2D {
       return;
     }
     
-    // Initialize routes for each edge (set up initial spline points)
-    this._initializeRoutes();
-    
     // Update which edges are part of high-count node pairs (>= thresholdNodes)
     this.updateHighCountEdges();
+    
+    // Initialize routes for each edge (set up initial spline points)
+    this._initializeRoutes();
     
     // Apply bundling iterations to pull compatible edges together
     this._applyBundling();
