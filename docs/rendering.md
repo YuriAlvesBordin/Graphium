@@ -185,6 +185,50 @@ Options:
 
 ---
 
+## Edge Star Mode
+
+`StarClusterRoutes` is an optional edge-routing provider that changes how links
+inside **fully connected clusters of 3+ nodes (cliques)** are drawn. When
+enabled, every intra-clique edge is rendered as a two-segment polyline that
+passes through the cluster's virtual center (the live centroid of its member
+positions): `node A -> centroid -> node B`. Links outside any clique keep their
+straight source->target segment.
+
+### Activation
+
+```javascript
+const graph = new Graphium({ canvas, edgeStar: true });
+// or toggle at runtime:
+graph.setEdgeStar(true);
+graph.setEdgeStar(false);
+```
+
+### Implementation
+
+- `StarClusterRoutes` implements the `routes` protocol consumed by
+  `WebGLRenderer2D.render(model, routes)` (`getPointCount(index)` /
+  `getRoute(index)`); `Graphium.render()` passes it to the renderer.
+- Clusters are maximal cliques grown greedily in descending degree order
+  (**node-disjoint**: each node belongs to at most one star cluster, larger
+  clusters win).
+- Adjacency and clusters are rebuilt lazily only when `model.topologyRevision`
+  changes (adding/removing nodes/links, `setData`, `clear`); centroids are
+  recomputed once per frame from the live physics positions.
+- Picking (`pickLinkAt`) follows the star polyline segments, so clicks and
+  hovers match what is drawn.
+- Physics is unaffected — only the drawn geometry changes.
+
+### Known behavior
+
+- When a node has multiple edges in the same clique, the shared
+  node->centroid segments overlap exactly. This is expected (the overdraw makes
+  the node->hub "spoke" read as a single thicker line) and can be shaped via
+  `appearance.edgeOpacity`.
+- Clique detection uses all links regardless of direction/duplicates
+  (multi-edges are deduplicated for adjacency).
+
+---
+
 ## Extending Renderer
 
 See `WebGLRenderer2D` in `src/render/WebGLRenderer2D.js` for base implementation.
@@ -202,8 +246,8 @@ class CustomRenderer extends WebGLRenderer2D {
     return this.createProgram(vs, fs);
   }
 
-  render(model, bundling) {
-    super.render(model, bundling);
+  render(model) {
+    super.render(model);
     this.drawCustom(model);
   }
 

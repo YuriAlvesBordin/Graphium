@@ -23,11 +23,6 @@ graph TD
         CO[Coarsening2D<br/>Multi-Level HEM]
     end
 
-    subgraph "Edge Bundling"
-        EB[EdgeBundling2D<br/>Geometric Routing]
-        SG[SegmentGrid<br/>Spatial Index]
-    end
-
     subgraph "Rendering"
         CAM[Camera2D<br/>Viewport/Transform]
         WGL[WebGLRenderer2D<br/>Instanced Draws]
@@ -39,7 +34,6 @@ graph TD
 
     G2D --> GM
     G2D --> PH
-    G2D --> EB
     G2D --> CAM
     G2D --> WGL
     G2D --> PC
@@ -49,17 +43,12 @@ graph TD
     PH --> EC
     PH --> CO
 
-    EB --> GM
-    EB --> SG
-
     EC --> GM
-    EC -.-> EB
 
     CO --> GM
 
     WGL --> GM
     WGL --> CAM
-    WGL -.-> EB
 
     PC --> GM
     PC --> CAM
@@ -75,7 +64,6 @@ sequenceDiagram
     participant User
     participant G2D as Graphium
     participant PH as Physics2D
-    participant EB as EdgeBundling2D
     participant EC as EdgeConflictDetector2D
     participant WGL as WebGLRenderer2D
     participant CAM as Camera2D
@@ -92,14 +80,7 @@ sequenceDiagram
         PH->>PH: integrate positions
         PH->>PH: sleep/wake detection
 
-        alt bundling dirty or topology changed
-            G2D->>EB: updateIfNeeded()
-            EB->>EB: geometric bundling algorithm
-            EB->>SG: build segment grid
-            EB->>EB: compute bundled routes
-        end
-
-        G2D->>WGL: render(model, bundling)
+        G2D->>WGL: render(model)
         WGL->>CAM: get view matrix
         WGL->>WGL: update GPU buffers
         WGL->>WGL: draw nodes (instanced TRIANGLE_FAN)
@@ -118,8 +99,7 @@ sequenceDiagram
 | **SpatialHash2D** | `src/physics/SpatialHash2D.js` | O(1) spatial grid for neighbor queries |
 | **EdgeConflictDetector2D** | `src/physics/EdgeConflict2D.js` | Crossing detection, proximity/overlap correction |
 | **Coarsening2D** | `src/physics/Coarsening2D.js` | Heavy-Edge Matching for multi-level initialization |
-| **EdgeBundling2D** | `src/physics/EdgeBundling2D.js` | Geometric route computation, segment compatibility |
-| **SegmentGrid** | `src/physics/EdgeBundling2D.js` | Spatial index for edge segments |
+| **SegmentGrid** | `src/physics/SegmentGrid.js` | Spatial index for edge segments (used by conflict detection) |
 | **Camera2D** | `src/render/Camera2D.js` | Viewport, zoom/pan, world↔screen transforms |
 | **WebGLRenderer2D** | `src/render/WebGLRenderer2D.js` | Instanced WebGL2 rendering, avatar atlas, shaders |
 | **PointerController** | `src/interaction/PointerController.js` | Pointer events, drag/pan/zoom/pinch, picking |
@@ -140,14 +120,11 @@ graph LR
 
     subgraph "Consumers"
         PH[Physics2D]
-        EB[EdgeBundling2D]
         WGL[WebGLRenderer2D]
     end
 
     TR --> PH
-    TR --> EB
     PR --> PH
-    PR --> EB
     PR --> WGL
     AR --> WGL
 ```
@@ -175,7 +152,6 @@ All performance-critical loops use **pre-allocated TypedArrays**. See `Physics2D
 | Extension | How |
 |-----------|-----|
 | **Custom forces** | Subclass `Physics2D` (see `src/physics/Physics2D.js`), override `_applyRepulsionAndCollisions()` etc. |
-| **Custom bundling** | Implement `RouteProvider` interface, call `physics.setRouteProvider()` (see `src/physics/Physics2D.js`) |
 | **Custom rendering** | Extend `WebGLRenderer2D` (see `src/render/WebGLRenderer2D.js`), override `render()` or shader sources |
 | **Custom interaction** | Replace `PointerController` (see `src/interaction/PointerController.js`), implement `on(type, cb)` interface |
 
@@ -186,17 +162,14 @@ All performance-critical loops use **pre-allocated TypedArrays**. See `Physics2D
 ```mermaid
 graph TD
     GM[GraphModel<br/>core] --> PH[Physics2D]
-    GM --> EB[EdgeBundling2D]
     GM --> CAM[Camera2D]
     GM --> WGL[WebGLRenderer2D]
     GM --> PC[PointerController]
 
     PH --> EC[EdgeConflictDetector2D]
     PH --> CO[Coarsening2D]
-    EB --> SG[SegmentGrid]
 ```
 
 - **GraphModel** is the single source of truth -- no module owns data
-- **Physics2D** and **EdgeBundling2D** are the only modules that *write* positions
 - **WebGLRenderer2D** is read-only on model data
 - **PointerController** writes only via `Graphium` facade methods

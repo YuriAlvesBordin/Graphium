@@ -1,7 +1,7 @@
 {
   "name": "graphium",
   "version": "1.0.0",
-  "description": "High-performance WebGL2 2D graph visualization library with force-directed layout, edge bundling, and interactive controls",
+  "description": "High-performance WebGL2 2D graph visualization library with force-directed layout and interactive controls",
   "type": "module",
   "main": "src/Graphium.js",
   "module": "src/Graphium.js",
@@ -18,7 +18,6 @@
     "webgl",
     "webgl2",
     "force-directed",
-    "edge-bundling",
     "network",
     "d3-alternative"
   ],

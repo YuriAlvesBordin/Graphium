@@ -24,7 +24,6 @@
 |---------|-------------|
 | **Fast** | Instanced WebGL2 rendering handles 10,000+ nodes at 60fps |
 | **Physics-based** | Force-directed layout with Verlet integration, collision, and automatic sleep/wake |
-| **Edge Bundling** | Geometric bundling reduces visual clutter -- parallel, layered, or individual modes |
 | **Smart Conflict Resolution** | Detects and corrects edge crossings, proximity overlaps, and alignment issues |
 | **Rich Interaction** | Drag, pan, zoom, pinch, hover, click, long-press, link selection |
 | **Zero Dependencies** | Single ES module, runs directly in browser -- no build, no npm install required |
@@ -36,9 +35,6 @@
 
 ### Force-Directed Layout
 Nodes repel, links act as springs, system settles into equilibrium automatically.
-
-### Edge Bundling
-Parallel edges merge into clean bundles -- choose from parallel, layered, or individual rendering.
 
 ### Edge Conflict Resolution
 Crossings, overlaps, and tight angles detected and corrected in real-time.
@@ -58,7 +54,6 @@ Instanced draws, avatar atlas, dashed edges, per-node state styling -- all on GP
 | [Architecture](docs/architecture.md) | System overview, data flow, module dependencies |
 | [Physics Engine](docs/physics.md) | Forces, integration, sleep/wake, parameters |
 | [Rendering](docs/rendering.md) | WebGL2 pipeline, shaders, instancing, atlas |
-| [Edge Bundling](docs/bundling.md) | Geometric bundling, compatibility, render modes |
 | [Interaction](docs/interaction.md) | Pointer controller, gestures, picking, events |
 | [Data Model](docs/data-model.md) | GraphModel, TypedArray storage, revisions |
 | [API Reference](docs/api-reference.md) | Complete class/method/option reference |

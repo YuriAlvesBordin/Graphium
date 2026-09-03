@@ -1,4 +1,4 @@
-import { SegmentGrid } from './EdgeBundling2D.js';
+import { SegmentGrid } from './SegmentGrid.js';
 import { NODE_DRAGGED, NODE_FIXED } from '../core/GraphModel.js';
 
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
@@ -24,7 +24,6 @@ const DEFAULTS = {
   edgeConflictEnergyScale: 1,
   draggedNodeConflictWeight: 0.1,
   sharedEndpointExclusion: 0.18,
-  edgeConflictUseBundledRoutes: false,
   edgeConflictCellSize: 48,
   debug: false,
   edgeConflictEvents: false,
@@ -91,7 +90,6 @@ export class EdgeConflictDetector2D {
   constructor(model, options = {}) {
     this.model = model;
     this.options = { ...DEFAULTS, ...options };
-    this.routeProvider = null;
     this.grid = new SegmentGrid(this.options.edgeConflictCellSize, Math.max(256, model.linkCapacity * 4));
     this.segmentCapacity = Math.max(16, model.linkCapacity * 8);
     this.segmentEdge = new Int32Array(this.segmentCapacity);
@@ -123,10 +121,6 @@ export class EdgeConflictDetector2D {
     this.onSolved = null;
   }
 
-  setRouteProvider(provider) {
-    this.routeProvider = provider;
-    return this;
-  }
   setOptions(options = {}) {
     Object.assign(this.options, options);
     if (options.edgeConflictCellSize) {
@@ -189,14 +183,6 @@ export class EdgeConflictDetector2D {
 
   _routePoint(edge, pointIndex, out) {
     const m = this.model;
-    const provider = this.routeProvider;
-    if (this.options.edgeConflictUseBundledRoutes && provider && provider.getRoute && provider.getPointCount && provider.getPointCount(edge) > 1) {
-      const route = provider.getRoute(edge);
-      const offset = pointIndex * 2;
-      out[0] = route[offset];
-      out[1] = route[offset + 1];
-      return;
-    }
     const a = m.source[edge];
     const b = m.target[edge];
     const count = pointIndex === 0 ? 0 : 1;
@@ -214,31 +200,18 @@ export class EdgeConflictDetector2D {
       if (m.linkFlags[e] & 2) {
         continue;
       }
-      const pointCount = this.options.edgeConflictUseBundledRoutes && this.routeProvider?.getPointCount ? this.routeProvider.getPointCount(e) : 2;
-      const segmentCount = Math.max(1, pointCount - 1);
-      this.ensureSegmentCapacity(count + segmentCount);
-      for (let p = 0; p < segmentCount; p++) {
-        if (this.options.edgeConflictUseBundledRoutes && this.routeProvider?.getRoute(e)) {
-          const route = this.routeProvider.getRoute(e);
-          const ao = p * 2;
-          const bo = ao + 2;
-          a[0] = route[ao];
-          a[1] = route[ao + 1];
-          b[0] = route[bo];
-          b[1] = route[bo + 1];
-        } else {
-          this._routePoint(e, 0, a);
-          this._routePoint(e, 1, b);
-        }
-        this.segmentEdge[count] = e;
-        this.segmentLocal[count] = p;
-        this.segmentAx[count] = a[0];
-        this.segmentAy[count] = a[1];
-        this.segmentBx[count] = b[0];
-        this.segmentBy[count] = b[1];
-        this.grid.insertSegmentBounds(count, p, a[0], a[1], b[0], b[1]);
-        count++;
-      }
+      // Each edge is a single segment (no bundling)
+      this.ensureSegmentCapacity(count + 1);
+      this._routePoint(e, 0, a);
+      this._routePoint(e, 1, b);
+      this.segmentEdge[count] = e;
+      this.segmentLocal[count] = 0;
+      this.segmentAx[count] = a[0];
+      this.segmentAy[count] = a[1];
+      this.segmentBx[count] = b[0];
+      this.segmentBy[count] = b[1];
+      this.grid.insertSegmentBounds(count, 0, a[0], a[1], b[0], b[1]);
+      count++;
     }
     this.segmentCount = count;
     return count;
@@ -402,7 +375,7 @@ export class EdgeConflictDetector2D {
   }
 
   _routeSegmentCount(edge) {
-    return this.options.edgeConflictUseBundledRoutes && this.routeProvider?.getPointCount ? Math.max(1, this.routeProvider.getPointCount(edge) - 1) : 1;
+    return 1;
   }
 
   /**

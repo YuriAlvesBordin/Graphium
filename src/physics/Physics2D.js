@@ -40,7 +40,6 @@ const DEFAULTS = {
   edgeConflictEnergyScale: 1,
   draggedNodeConflictWeight: 0.1,
   sharedEndpointExclusion: 0.18,
-  edgeConflictUseBundledRoutes: false,
   edgeConflictCellSize: 48,
   edgeConflictEvents: false,
   edgeConflictRebuildThreshold: 1,
@@ -111,11 +110,7 @@ export class Physics2D {
     }
   }
 
-  setRouteProvider(provider) {
-    this.edgeConflicts.setRouteProvider(provider);
-    return this;
-  }
-  getConflictDiagnostics() {
+    getConflictDiagnostics() {
     return { ...this.edgeConflicts.debug };
   }
   measureConflictEnergy() {

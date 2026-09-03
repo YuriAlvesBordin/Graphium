@@ -98,6 +98,9 @@ graph TD
 | `linkDashGap` | `Float32Array` | `linkCount` | Dash gap |
 | `linkDashOffset` | `Float32Array` | `linkCount` | Dash offset |
 | `linkDashWorld` | `Uint8Array` | `linkCount` | 0=screen, 1=world |
+| `linkArrow` | `Int8Array` | `linkCount` | Arrow tri-state: 1=on, -1=off, 0=inherit global |
+| `linkArrowSize` | `Float32Array` | `linkCount` | Arrow length (screen px) |
+| `linkArrowWidth` | `Float32Array` | `linkCount` | Arrow base width (screen px) |
 
 ---
 
@@ -174,7 +177,6 @@ graph LR
 
     subgraph "Consumers"
         PH[Physics2D]
-        EB[EdgeBundling2D]
         WG[WebGLRenderer2D]
     end
 
@@ -182,17 +184,15 @@ graph LR
     NP --> PR
     NA --> AR
     TR --> PH
-    TR --> EB
     PR --> PH
-    PR --> EB
     PR --> WG
     AR --> WG
 ```
 
 | Revision | Incremented By | Consumers React |
 |----------|----------------|-----------------|
-| `topologyRevision` | Node/link added/removed, `setData()` | Physics (rebuild spatial hash), Bundling (rebuild routes) |
-| `positionRevision` | `setNodePosition()`, physics step | Physics (forces), Bundling (incremental update), Renderer (buffer update) |
+| `topologyRevision` | Node/link added/removed, `setData()` | Physics (rebuild spatial hash) |
+| `positionRevision` | `setNodePosition()`, physics step | Physics (forces), Renderer (buffer update) |
 | `appearanceRevision` | Color, size, style, image changes | Renderer (re-upload instance buffers) |
 
 ---

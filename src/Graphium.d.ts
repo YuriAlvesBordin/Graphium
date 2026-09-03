@@ -37,6 +37,12 @@ export interface LinkAppearance {
   dash?: [number, number];
   dashOffset?: number;
   dashScaleWithZoom?: boolean;
+  /** Overrides the global edgeArrowEnabled for this link: true forces the arrow on, false forces it off (default: follows the global setting) */
+  arrow?: boolean;
+  /** Arrow head length in screen pixels (default: 10) */
+  arrowSize?: number;
+  /** Arrow head base width in screen pixels (default: 6) */
+  arrowWidth?: number;
 }
 
 export interface AppearanceOptions {
@@ -63,6 +69,12 @@ export interface AppearanceOptions {
   selectedEdgeColor?: RGBA;
   selectedEdgeWidthMultiplier?: number;
   selectedEdgeOpacity?: number;
+  /** Whether to render a direction arrowhead at the target end of every link (default: false) */
+  edgeArrowEnabled?: boolean;
+  /** Arrow head length in screen pixels (default: 10) */
+  edgeArrowSize?: number;
+  /** Arrow head base width in screen pixels (default: 6) */
+  edgeArrowWidth?: number;
 }
 
 export interface NodeOptions extends NodeAppearance {
@@ -127,30 +139,9 @@ export interface PhysicsOptions {
   edgeConflictEnergyScale?: number;
   draggedNodeConflictWeight?: number;
   sharedEndpointExclusion?: number;
-  edgeConflictUseBundledRoutes?: boolean;
   edgeConflictCellSize?: number;
   edgeConflictEvents?: boolean;
   edgeConflictRebuildThreshold?: number;
-}
-export interface BundlingOptions {
-  edgeBundling?: boolean;
-  bundleMode?: 'geometric';
-  bundleStrength?: number;
-  bundleIterations?: number;
-  bundleSubdivisions?: number;
-  bundleCompatibility?: number;
-  bundleRadius?: number;
-  nodeSeparationLength?: number;
-  maxBundleSize?: number;
-  maxBundlePairs?: number;
-  preserveEdgeStyle?: boolean;
-  preserveEdgeIdentity?: boolean;
-  avoidNodeInteriors?: boolean;
-  bundleShortEdges?: boolean;
-  avoidSharedNodes?: boolean;
-  thresholdNodes?: number;
-  movementThreshold?: number;
-  bundleRenderMode?: 'shared' | 'parallel' | 'layered' | 'individual';
 }
 export interface CameraOptions {
   width?: number;
@@ -161,7 +152,7 @@ export interface CameraOptions {
   minZoom?: number;
   maxZoom?: number;
 }
-export interface GraphiumOptions extends BundlingOptions {
+export interface GraphiumOptions {
   canvas?: HTMLCanvasElement | OffscreenCanvas;
   autoStart?: boolean;
   nodeCapacity?: number;
@@ -171,6 +162,8 @@ export interface GraphiumOptions extends BundlingOptions {
   appearance?: AppearanceOptions;
   renderer?: Record<string, unknown>;
   interaction?: boolean | Record<string, unknown>;
+  /** Whether to render edges inside fully connected clusters of 3+ nodes as a star routed through the cluster center (default: false) */
+  edgeStar?: boolean;
   /** Whether to render node labels (default: false) */
   renderLabels?: boolean;
   /** Position of label relative to node: 'above', 'below', or 'center' (default: 'below') */
@@ -195,13 +188,6 @@ export interface LinkSnapshot extends LinkData {
   targetIndex: number;
   color: number;
   dashPattern: [number, number];
-}
-export interface BundleInfo {
-  linkIndex: number;
-  bundleId: number;
-  bundleSize: number;
-  mode: string;
-  pointCount: number;
 }
 export type ConflictType = 'overlap' | 'proximity' | 'crossing';
 export interface EdgeConflictEvent extends GraphEvent {
@@ -272,6 +258,10 @@ export class GraphModel {
   linkDashGap: Float32Array;
   linkDashOffset: Float32Array;
   linkDashWorld: Uint8Array;
+  /** Arrow tri-state: 1 = always on, -1 = always off, 0 = follow global edgeArrowEnabled */
+  linkArrow: Int8Array;
+  linkArrowSize: Float32Array;
+  linkArrowWidth: Float32Array;
   constructor(options?: { nodeCapacity?: number; linkCapacity?: number; nodeDefaults?: NodeAppearance; linkDefaults?: LinkAppearance });
   getNodeIndex(id: GraphId): number;
   getLinkIndex(id: GraphId): number;
@@ -316,7 +306,6 @@ export class EdgeConflictDetector2D {
   persistentConflict: boolean;
   debug: ConflictDiagnostics;
   constructor(model: GraphModel, options?: PhysicsOptions);
-  setRouteProvider(provider: EdgeBundling2D): this;
   setOptions(options: PhysicsOptions): this;
   ensureNodeCapacity(required: number): void;
   evaluate(applyCorrections?: boolean): number;
@@ -330,26 +319,11 @@ export class Physics2D {
   edgeConflictEnergy: number;
   constructor(model: GraphModel, spatialHash: SpatialHash2D, options?: PhysicsOptions);
   setOptions(options: PhysicsOptions): void;
-  setRouteProvider(provider: EdgeBundling2D): this;
   getConflictDiagnostics(): ConflictDiagnostics;
   measureConflictEnergy(): number;
   wake(): void;
   reset(): void;
   step(dt?: number): number;
-}
-export class EdgeBundling2D {
-  dirty: boolean;
-  routeRevision: number;
-  constructor(model: GraphModel, options?: BundlingOptions);
-  setOptions(options: BundlingOptions): void;
-  markDirty(): void;
-  rebuild(): this;
-  updateIfNeeded(force?: boolean): this;
-  clear(): void;
-  getRoute(index: number): Float32Array | null;
-  getPointCount(index: number): number;
-  getRouteSnapshot(index: number): Float32Array | null;
-  getBundleInfo(index: number): BundleInfo;
 }
 export class Coarsening2D {
   levels: Array<{ nodeCount: number; fineToCoarse: Int32Array }>;
@@ -380,7 +354,7 @@ export class WebGLRenderer2D {
   setCamera(camera: Camera2D): this;
   setAppearance(appearance?: AppearanceOptions): this;
   resize(width?: number, height?: number, pixelRatio?: number): this;
-  render(model: GraphModel, routes?: EdgeBundling2D): void;
+  render(model: GraphModel, routes?: any): void;
   destroy(): void;
 }
 export class PointerController {
@@ -391,12 +365,17 @@ export class PointerController {
   disable(): this;
   destroy(): void;
 }
+export class StarClusterRoutes {
+  constructor(model: GraphModel);
+  beginFrame(): this;
+  getPointCount(linkIndex: number): number;
+  getRoute(linkIndex: number): Float32Array | null;
+}
 export class Graphium {
   readonly model: GraphModel;
   readonly physics: Physics2D;
   readonly camera: Camera2D;
   readonly renderer: WebGLRenderer2D;
-  readonly bundling: EdgeBundling2D;
   readonly pointer: PointerController | null;
   readonly nodeCount: number;
   readonly linkCount: number;
@@ -419,6 +398,7 @@ export class Graphium {
   setNodeAppearance(idOrIndex: GraphId, appearance: NodeAppearance): boolean;
   setLinkAppearance(idOrIndex: GraphId, appearance: LinkAppearance): boolean;
   setAppearance(appearance: AppearanceOptions): this;
+  setEdgeStar(enabled: boolean): this;
   selectNode(idOrIndex: GraphId, selected?: boolean): boolean;
   selectLink(idOrIndex: GraphId, selected?: boolean): boolean;
   pickLinkAt(worldX: number, worldY: number, hitRadius?: number): number;
@@ -428,12 +408,7 @@ export class Graphium {
   start(): this;
   stop(): this;
   destroy(): void;
-  rebuildEdgeBundles(): this;
-  clearEdgeBundles(): this;
-  setBundlingOptions(options: BundlingOptions): this;
   setPhysicsOptions(options: PhysicsOptions): this;
-  getEdgeRoute(linkId: GraphId): Float32Array | null;
-  getBundleInfo(linkId: GraphId): BundleInfo | null;
   getConflictEnergy(): number;
   measureConflictEnergy(): number;
   getConflictDiagnostics(): ConflictDiagnostics;

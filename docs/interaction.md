@@ -167,7 +167,7 @@ graph TD
     B --> C[World Coordinates]
     C --> D[Iterate all links]
     D --> E{For each link}
-    E --> F[Get route from bundling\nor straight line]
+    E --> F[Get route]
     F --> G[Check distance to each segment]
     G --> H[Distance < hitRadius + lineWidth/2?]
     H -->|Yes| I[Track closest]
@@ -176,7 +176,7 @@ graph TD
 ```
 
 - **Hit radius**: Configurable (default 7px) + half line width
-- **Bundled routes**: Uses actual spline segments for picking
+- **Route lookup**: Uses straight line segments for picking
 - **Performance**: O(links) -- see `Graphium.pickLinkAt()` in `src/Graphium.js`
 
 ---

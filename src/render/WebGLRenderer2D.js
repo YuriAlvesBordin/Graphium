@@ -130,6 +130,55 @@ void main() {
   outColor = vec4(vColor.rgb, vColor.a * alpha);
 }`;
 
+const ARROW_VERTEX = `#version 300 es
+precision highp float;
+layout(location=0) in vec2 aCorner;
+layout(location=1) in vec4 aArrow;
+layout(location=2) in vec4 aColor;
+layout(location=3) in float aHalfWidth;
+uniform mat3 uCamera;
+out vec2 vLocal;
+flat out float vLength;
+flat out float vHalfWidth;
+out vec4 vColor;
+void main() {
+  vec2 base = aArrow.xy;
+  vec2 tip = aArrow.zw;
+  vec2 direction = tip - base;
+  float worldLength = max(length(direction), 0.00001);
+  vec2 dirNorm = direction / worldLength;
+  vec2 normal = vec2(-dirNorm.y, dirNorm.x);
+  float t = (aCorner.x + 1.0) * 0.5;
+  vec2 world = base + dirNorm * (t * worldLength) + normal * aCorner.y * aHalfWidth * (1.0 - t);
+  gl_Position = vec4((uCamera * vec3(world, 1.0)).xy, 0.0, 1.0);
+  vLocal = vec2(t * worldLength, aCorner.y * aHalfWidth * (1.0 - t));
+  vLength = worldLength;
+  vHalfWidth = aHalfWidth;
+  vColor = aColor;
+}`;
+
+const ARROW_FRAGMENT = `#version 300 es
+precision highp float;
+in vec2 vLocal;
+flat in float vLength;
+flat in float vHalfWidth;
+in vec4 vColor;
+out vec4 outColor;
+void main() {
+  float u = vLocal.x;
+  float v = vLocal.y;
+  float L = vLength;
+  float W = vHalfWidth;
+  if (L <= 0.00001) discard;
+  // Signed distance to the triangle edges (base (0,+/-W) -> tip (L,0)), positive inside.
+  float dEdges = (W * L - W * u - abs(v) * L) / length(vec2(L, W));
+  float d = min(u, dEdges);
+  float aa = max(fwidth(d), 0.002);
+  float alpha = smoothstep(-aa, aa, d);
+  if (alpha <= 0.0) discard;
+  outColor = vec4(vColor.rgb, vColor.a * alpha);
+}`;
+
 function compileShader(gl, type, source) {
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
@@ -201,15 +250,20 @@ export class WebGLRenderer2D {
     this.gl = null;
     this.nodeProgram = null;
     this.edgeProgram = null;
+    this.arrowProgram = null;
     this.camera = null;
     this.nodeCapacity = 0;
     this.segmentCapacity = 0;
+    this.arrowCapacity = 0;
     this.nodeData = new Float32Array(0);
     this.segmentData = new Float32Array(0);
+    this.arrowData = new Float32Array(0);
     this.nodeVAO = null;
     this.edgeVAO = null;
+    this.arrowVAO = null;
     this.nodeBuffer = null;
     this.edgeBuffer = null;
+    this.arrowBuffer = null;
     this.cornerBuffer = null;
     this.avatarTexture = null;
     this.avatarCanvas = null;
@@ -218,6 +272,7 @@ export class WebGLRenderer2D {
     this.nextImageSlot = 0;
     this.nodeDrawCount = 0;
     this.segmentDrawCount = 0;
+    this.arrowDrawCount = 0;
     this.lastRenderMs = 0;
     if (canvas) {
       this.attachCanvas(canvas);
@@ -245,6 +300,7 @@ export class WebGLRenderer2D {
     const gl = this.gl;
     this.nodeProgram = createProgram(gl, NODE_VERTEX, NODE_FRAGMENT);
     this.edgeProgram = createProgram(gl, EDGE_VERTEX, EDGE_FRAGMENT);
+    this.arrowProgram = createProgram(gl, ARROW_VERTEX, ARROW_FRAGMENT);
     this.cornerBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
@@ -276,6 +332,25 @@ export class WebGLRenderer2D {
       gl.vertexAttribPointer(attribute, 4, gl.FLOAT, false, edgeStride, (attribute - 1) * 16);
       gl.vertexAttribDivisor(attribute, 1);
     }
+    this.arrowVAO = gl.createVertexArray();
+    this.arrowBuffer = gl.createBuffer();
+    gl.bindVertexArray(this.arrowVAO);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerBuffer);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.arrowBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, 16, gl.DYNAMIC_DRAW);
+    // Instance layout (9 floats): baseX, baseY, tipX, tipY, colorRGBA, halfWidth
+    const arrowStride = 9 * 4;
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, arrowStride, 0);
+    gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 4, gl.FLOAT, false, arrowStride, 4 * 4);
+    gl.vertexAttribDivisor(2, 1);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 1, gl.FLOAT, false, arrowStride, 8 * 4);
+    gl.vertexAttribDivisor(3, 1);
     this.avatarCanvas = createCanvas(512);
     this.avatarContext = this.avatarCanvas?.getContext('2d') || null;
     this.avatarTexture = gl.createTexture();
@@ -328,6 +403,13 @@ export class WebGLRenderer2D {
     }
     this.segmentCapacity = Math.max(required, this.segmentCapacity * 2 || 512);
     this.segmentData = new Float32Array(this.segmentCapacity * 20);
+  }
+  _ensureArrowCapacity(required) {
+    if (required <= this.arrowCapacity) {
+      return;
+    }
+    this.arrowCapacity = Math.max(required, this.arrowCapacity * 2 || 256);
+    this.arrowData = new Float32Array(this.arrowCapacity * 9);
   }
 
   _requestImage(url) {
@@ -542,17 +624,106 @@ export class WebGLRenderer2D {
   }
 
   /**
+   * @brief Fills instanced arrow-head data for links that have arrows enabled.
+   * @param {import('../core/GraphModel.js').GraphModel} model Graph data model.
+   * @param {any} [routes] Edge routing provider.
+   */
+  _fillArrowData(model, routes) {
+    const globalEnabled = this.appearance.edgeArrowEnabled;
+    let needed = 0;
+    for (let index = 0; index < model.linkCount; index++) {
+      if (model.linkFlags[index] & LINK_HIDDEN) {
+        continue;
+      }
+      const arrow = model.linkArrow[index];
+      if (arrow === 1 || (arrow === 0 && globalEnabled)) {
+        // Skip arrow for star-routed edges (to avoid visual confusion)
+        if (routes && routes.getPointCount(index) > 0) {
+          continue;
+        }
+        needed++;
+      }
+    }
+    this._ensureArrowCapacity(needed);
+    const zoom = Math.max(this.camera?.zoom || 1, 0.0001);
+    let write = 0;
+    for (let index = 0; index < model.linkCount; index++) {
+      if (model.linkFlags[index] & LINK_HIDDEN) {
+        continue;
+      }
+      const arrow = model.linkArrow[index];
+      if (!(arrow === 1 || (arrow === 0 && globalEnabled))) {
+        continue;
+      }
+      // Skip arrow for star-routed edges (to avoid visual confusion)
+      if (routes && routes.getPointCount(index) > 0) {
+        continue;
+      }
+      const source = model.source[index];
+      const target = model.target[index];
+      const tx = model.x[target];
+      const ty = model.y[target];
+      const route = routes?.getRoute(index);
+      const points = routes?.getPointCount(index) || 0;
+      let dx;
+      let dy;
+      if (route && points > 1) {
+        const lastX = route[(points - 2) * 2];
+        const lastY = route[(points - 2) * 2 + 1];
+        dx = tx - lastX;
+        dy = ty - lastY;
+      } else {
+        dx = tx - model.x[source];
+        dy = ty - model.y[source];
+      }
+      const length = Math.hypot(dx, dy);
+      const arrowSize = model.linkArrowSize[index] / zoom;
+      if (length < 0.0001 || arrowSize <= 0) {
+        continue;
+      }
+      const ndx = dx / length;
+      const ndy = dy / length;
+      const halfWidth = Math.max(0, model.linkArrowWidth[index] / (2 * zoom));
+      const radius = model.visualRadius[target] || 0;
+      // Place the tip slightly outside the node to avoid being covered by the node disc.
+      const tipOffset = radius + arrowSize * 0.2;
+      const tipX = tx - ndx * tipOffset;
+      const tipY = ty - ndy * tipOffset;
+      const baseX = tipX - ndx * arrowSize;
+      const baseY = tipY - ndy * arrowSize;
+      const selected = (model.linkFlags[index] & LINK_SELECTED) !== 0;
+      const color = selected ? unpackRGBA(packRGBA(this.appearance.selectedEdgeColor)) : unpackRGBA(model.linkColor[index]);
+      // Arrows are direction indicators: keep them at the link color's full
+      // strength instead of inheriting the (often faded) edge opacity.
+      const opacity = selected ? this.appearance.selectedEdgeOpacity : 1;
+      const offset = write * 9;
+      this.arrowData[offset] = baseX;
+      this.arrowData[offset + 1] = baseY;
+      this.arrowData[offset + 2] = tipX;
+      this.arrowData[offset + 3] = tipY;
+      this.arrowData[offset + 4] = color[0];
+      this.arrowData[offset + 5] = color[1];
+      this.arrowData[offset + 6] = color[2];
+      this.arrowData[offset + 7] = color[3] * opacity;
+      this.arrowData[offset + 8] = halfWidth;
+      write++;
+    }
+    this.arrowDrawCount = write;
+  }
+
+  /**
    * @brief Renders graph links followed by nodes.
    * @param {import('../core/GraphModel.js').GraphModel} model Graph data model.
-   * @param {import('../physics/EdgeBundling2D.js').EdgeBundling2D} [routes] Edge routing provider.
+   * @param {any} [routes] Edge routing provider.
    */
   render(model, routes) {
-    if (!this.gl || !this.camera) {
+if (!this.gl || !this.camera) {
       return;
     }
     const gl = this.gl;
     const started = performance.now();
     this._fillSegmentData(model, routes);
+    this._fillArrowData(model, routes);
     this._fillNodeData(model);
     gl.clearColor(...this.options.clearColor);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -563,6 +734,17 @@ export class WebGLRenderer2D {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.edgeBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.segmentData.subarray(0, this.segmentDrawCount * 20), gl.DYNAMIC_DRAW);
     gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, this.segmentDrawCount);
+    if (this.arrowDrawCount > 0) {
+      gl.useProgram(this.arrowProgram);
+      const uCameraLoc = gl.getUniformLocation(this.arrowProgram, 'uCamera');
+      if (uCameraLoc) {
+        gl.uniformMatrix3fv(uCameraLoc, false, this.camera.matrix);
+      }
+      gl.bindVertexArray(this.arrowVAO);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.arrowBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, this.arrowData.subarray(0, this.arrowDrawCount * 9), gl.DYNAMIC_DRAW);
+      gl.drawArraysInstanced(gl.TRIANGLE_FAN, 0, 4, this.arrowDrawCount);
+    }
     gl.useProgram(this.nodeProgram);
     gl.uniformMatrix3fv(gl.getUniformLocation(this.nodeProgram, 'uCamera'), false, this.camera.matrix);
     gl.uniform1f(gl.getUniformLocation(this.nodeProgram, 'uZoom'), this.camera.zoom);
@@ -598,12 +780,20 @@ export class WebGLRenderer2D {
       gl.deleteProgram(this.edgeProgram);
     }
 
+    if (this.arrowProgram) {
+      gl.deleteProgram(this.arrowProgram);
+    }
+
     if (this.nodeBuffer) {
       gl.deleteBuffer(this.nodeBuffer);
     }
 
     if (this.edgeBuffer) {
       gl.deleteBuffer(this.edgeBuffer);
+    }
+
+    if (this.arrowBuffer) {
+      gl.deleteBuffer(this.arrowBuffer);
     }
 
     if (this.cornerBuffer) {
@@ -620,6 +810,10 @@ export class WebGLRenderer2D {
 
     if (this.edgeVAO) {
       gl.deleteVertexArray(this.edgeVAO);
+    }
+
+    if (this.arrowVAO) {
+      gl.deleteVertexArray(this.arrowVAO);
     }
     this.imageRecords.clear();
     this.gl = null;

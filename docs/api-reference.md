@@ -27,26 +27,6 @@ interface GraphiumOptions {
   // Physics
   physics?: PhysicsOptions;         // See PhysicsOptions
 
-  // Edge Bundling
-  edgeBundling?: boolean;           // default: false
-  bundleMode?: 'geometric';         // default: 'geometric'
-  bundleStrength?: number;          // default: 0.35
-  bundleIterations?: number;        // default: 3
-  bundleSubdivisions?: number;      // default: 6
-  bundleCompatibility?: number;     // default: 0.65
-  bundleRadius?: number;            // default: 180
-  nodeSeparationLength?: number;    // default: 50
-  maxBundleSize?: number;           // default: 32
-  maxBundlePairs?: number;          // default: 10000
-  preserveEdgeStyle?: boolean;      // default: true
-  preserveEdgeIdentity?: boolean;   // default: true
-  avoidNodeInteriors?: boolean;     // default: true
-  bundleShortEdges?: boolean;       // default: false
-  avoidSharedNodes?: boolean;       // default: false
-  thresholdNodes?: number;          // default: 3
-  movementThreshold?: number;       // default: 1.5
-  bundleRenderMode?: 'shared' | 'parallel' | 'layered' | 'individual';  // default: 'parallel'
-
   // Camera
   camera?: CameraOptions;           // See CameraOptions
 
@@ -68,7 +48,6 @@ interface GraphiumOptions {
 | `physics` | `Physics2D` | Physics engine |
 | `camera` | `Camera2D` | Camera/viewport |
 | `renderer` | `WebGLRenderer2D` | WebGL renderer |
-| `bundling` | `EdgeBundling2D` | Edge bundling |
 | `pointer` | `PointerController \| null` | Interaction controller |
 | `nodeCount` | `number` | Current node count (readonly) |
 | `linkCount` | `number` | Current link count (readonly) |
@@ -174,35 +153,9 @@ const linkIndex = graph.pickLinkAt(100, 200, 10);  // Returns link index or -1
 graph.fit(40);  // Zoom to fit all nodes with 40px padding
 ```
 
-#### `rebuildEdgeBundles(): this`
-```typescript
-graph.rebuildEdgeBundles();  // Force recompute all routes
-```
-
-#### `clearEdgeBundles(): this`
-```typescript
-graph.clearEdgeBundles();  // Remove all bundled routes
-```
-
-#### `setBundlingOptions(options: BundlingOptions): this`
-```typescript
-graph.setBundlingOptions({ bundleStrength: 0.5, bundleRenderMode: 'layered' });
-```
-
 #### `setPhysicsOptions(options: PhysicsOptions): this`
 ```typescript
 graph.setPhysicsOptions({ repulsion: 1500, gravity: 0.005 });
-```
-
-#### `getEdgeRoute(linkId: GraphId): Float32Array | null`
-```typescript
-const route = graph.getEdgeRoute('A-B');  // [x0,y0,x1,y1,...]
-```
-
-#### `getBundleInfo(linkId: GraphId): BundleInfo | null`
-```typescript
-const info = graph.getBundleInfo('A-B');
-// { linkIndex, bundleId, bundleSize, mode, pointCount }
 ```
 
 #### `getConflictEnergy(): number`
@@ -280,7 +233,6 @@ unsubscribe();
 | `wake` | `{}` | Physics woke up |
 | `edgeconflict` | `{ edgeAId, edgeBId, edgeAIndex, edgeBIndex, type, severity, distance, angle }` | Edge conflict detected |
 | `edgeconflictsolved` | `{ energy }` | Conflicts resolved |
-| `bundleupdated` | `{ revision }` | Bundles recomputed |
 | `dataupdated` | `{ nodeCount, linkCount }` | Data changed via setData() |
 | `start` | `{}` | Animation started |
 | `stop` | `{}` | Animation stopped |
@@ -338,7 +290,6 @@ interface PhysicsOptions {
   edgeConflictEnergyScale?: number;       // default: 1
   draggedNodeConflictWeight?: number;     // default: 0.1
   sharedEndpointExclusion?: number;       // default: 0.18
-  edgeConflictUseBundledRoutes?: boolean; // default: false
   edgeConflictCellSize?: number;          // default: 48
   edgeConflictEvents?: boolean;           // default: false
   edgeConflictRebuildThreshold?: number;  // default: 1
@@ -394,6 +345,9 @@ interface AppearanceOptions {
   edgeOpacity?: number;             // default: 0.72
   edgeCap?: 'round' | 'butt';       // default: 'round'
   edgeJoin?: 'round' | 'bevel';     // default: 'round'
+  edgeArrowEnabled?: boolean;       // default: false
+  edgeArrowSize?: number;           // default: 10 (screen px)
+  edgeArrowWidth?: number;          // default: 6 (screen px)
 
   // Rings
   hoverRingColor?: RGBA;            // default: '#007aff'
@@ -486,6 +440,9 @@ interface LinkAppearance {
   dash?: [number, number];
   dashOffset?: number;
   dashScaleWithZoom?: boolean;
+  arrow?: boolean;                  // true/false force the arrow on/off; unset follows edgeArrowEnabled
+  arrowSize?: number;               // default: 10 (screen px)
+  arrowWidth?: number;              // default: 6 (screen px)
 }
 ```
 
@@ -527,14 +484,6 @@ interface LinkSnapshot extends LinkData {
   dashPattern: [number, number];
 }
 
-interface BundleInfo {
-  linkIndex: number;
-  bundleId: number;
-  bundleSize: number;
-  mode: string;
-  pointCount: number;
-}
-
 interface ConflictDiagnostics {
   edgeConflictPairs: number;
   edgeCrossings: number;
@@ -558,7 +507,6 @@ class Physics2D {
   constructor(model: GraphModel, spatialHash: SpatialHash2D, options?: PhysicsOptions)
 
   setOptions(options: PhysicsOptions): void
-  setRouteProvider(provider: EdgeBundling2D): this
   getConflictDiagnostics(): ConflictDiagnostics
   measureConflictEnergy(): number
   wake(): void
@@ -570,29 +518,6 @@ class Physics2D {
   onWake: () => void | null;
   onEdgeConflict: (edgeA, edgeB, type, severity, distance, angle) => void | null;
   onEdgeConflictSolved: (energy: number) => void | null;
-}
-```
-
----
-
-## EdgeBundling2D
-
-```typescript
-class EdgeBundling2D {
-  dirty: boolean;
-  routeRevision: number;
-
-  constructor(model: GraphModel, options?: BundlingOptions)
-
-  setOptions(options: BundlingOptions): void
-  markDirty(): void
-  rebuild(): this
-  updateIfNeeded(force?: boolean): this
-  clear(): void
-  getRoute(index: number): Float32Array | null
-  getPointCount(index: number): number
-  getRouteSnapshot(index: number): Float32Array | null
-  getBundleInfo(index: number): BundleInfo
 }
 ```
 
@@ -625,7 +550,6 @@ class EdgeConflictDetector2D {
 
   constructor(model: GraphModel, options?: PhysicsOptions)
 
-  setRouteProvider(provider: EdgeBundling2D): this
   setOptions(options: PhysicsOptions): this
   ensureNodeCapacity(required: number): void
   evaluate(applyCorrections?: boolean): number
@@ -664,7 +588,7 @@ class WebGLRenderer2D {
   setCamera(camera: Camera2D): this
   setAppearance(appearance?: AppearanceOptions): this
   resize(width?: number, height?: number, pixelRatio?: number): this
-  render(model: GraphModel, routes?: EdgeBundling2D): void
+  render(model: GraphModel, routes?: any): void
   destroy(): void
 }
 ```

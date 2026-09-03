@@ -91,7 +91,7 @@ See `Physics2D._applyRepulsionAndCollisions()` in `src/physics/Physics2D.js`.
 - Resolved via **position iterations** (`positionIterations`, default 3)
 
 ### 5. Edge Conflict Correction
-See [Edge Conflict Detection](docs/bundling.md#edge-conflict-detection) for details.
+Detects and corrects edge crossings, proximity overlaps, and alignment issues via repulsive forces.
 
 ---
 
@@ -248,7 +248,6 @@ physics: {
   edgeConflictEnergyScale: 1,
   draggedNodeConflictWeight: 0.1,
   sharedEndpointExclusion: 0.18,
-  edgeConflictUseBundledRoutes: false,
   edgeConflictCellSize: 48,
   edgeConflictEvents: false,
   edgeConflictRebuildThreshold: 1
@@ -263,11 +262,10 @@ physics: {
 |------------|-------------|-------|
 | 100 nodes, 200 links | 60 | Trivial |
 | 1,000 nodes, 3,000 links | 60 | Spatial hash shines |
-| 5,000 nodes, 15,000 links | 45-60 | Bundling helps |
-| 10,000 nodes, 30,000 links | 30-45 | Consider disabling bundling |
+| 5,000 nodes, 15,000 links | 45-60 | Good performance with spatial hash |
+| 10,000 nodes, 30,000 links | 30-45 | Higher density may lower FPS; consider reducing repulsionRadius or increasing damping |
 
 **Optimization tips:**
-- Disable `edgeBundling` for simple graphs
 - Set `nodeCapacity`/`linkCapacity` near expected size
 - Reduce `repulsionRadius` for dense local clusters
 - Use `fixedDt` for deterministic replay

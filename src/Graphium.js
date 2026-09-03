@@ -19,11 +19,12 @@ import {
 } from './core/GraphModel.js';
 import { SpatialHash2D } from './physics/SpatialHash2D.js';
 import { Physics2D } from './physics/Physics2D.js';
-import { EdgeBundling2D, SegmentGrid } from './physics/EdgeBundling2D.js';
+import { SegmentGrid } from './physics/SegmentGrid.js';
 import { EdgeConflictDetector2D } from './physics/EdgeConflict2D.js';
 import { Coarsening2D } from './physics/Coarsening2D.js';
 import { Camera2D } from './render/Camera2D.js';
 import { WebGLRenderer2D } from './render/WebGLRenderer2D.js';
+import { StarClusterRoutes } from './render/StarClusterRoutes.js';
 import { PointerController } from './interaction/PointerController.js';
 
 const DEFAULTS = {
@@ -31,21 +32,6 @@ const DEFAULTS = {
   nodeCapacity: 256,
   linkCapacity: 512,
   physics: {},
-  edgeBundling: false,
-  bundleMode: 'geometric',
-  bundleStrength: 0.35,
-  bundleIterations: 3,
-  bundleSubdivisions: 6,
-  bundleCompatibility: 0.65,
-  bundleRadius: 180,
-  nodeSeparationLength: 50,
-  maxBundleSize: 32,
-  maxBundlePairs: 10000,
-  preserveEdgeStyle: true,
-  preserveEdgeIdentity: true,
-  avoidNodeInteriors: true,
-  bundleShortEdges: false,
-  bundleRenderMode: 'parallel',
   camera: {},
   renderer: {},
   renderLabels: true,
@@ -75,14 +61,18 @@ const DEFAULTS = {
     selectedEdgeColor: '#007aff',
     selectedEdgeWidthMultiplier: 1.8,
     selectedEdgeOpacity: 1,
+    edgeArrowEnabled: true,
+    edgeArrowSize: 20,
+    edgeArrowWidth: 10,
   },
   interaction: true,
+  edgeStar: false,
 };
 
 export class Graphium {
   /**
    * @brief Constructs the main Graphium facade.
-   * @param options Configuration options covering bundling, physics, camera, renderer, and interaction.
+   * @param options Configuration options covering physics, camera, renderer, and interaction.
    */
   constructor(options = {}) {
     this.options = {
@@ -108,6 +98,8 @@ export class Graphium {
         width: this.options.appearance.edgeWidth,
         color: this.options.appearance.edgeColor,
         opacity: this.options.appearance.edgeOpacity,
+        arrowSize: this.options.appearance.edgeArrowSize,
+        arrowWidth: this.options.appearance.edgeArrowWidth,
       },
     });
     this.spatialHash = new SpatialHash2D({
@@ -121,6 +113,7 @@ export class Graphium {
       appearance: this.options.appearance,
     });
     this.renderer.setCamera(this.camera);
+    this._starRoutes = this.options.edgeStar ? new StarClusterRoutes(this.model) : null;
 
     this.labelContainer = document.createElement('div');
     Object.assign(this.labelContainer.style, {
@@ -140,15 +133,12 @@ export class Graphium {
     }
     this._labelElements = new Map();
 
-    this.bundling = new EdgeBundling2D(this.model, this.options);
-    this.physics.setRouteProvider(this.bundling);
     this.events = new Map();
     this.running = false;
     this.destroyed = false;
     this._raf = 0;
     this._lastTime = 0;
     this._cameraMoving = false;
-    this._lastRenderedBundleRevision = -1;
     this.pointer = null;
     if (this.options.canvas && this.options.interaction) {
       this.pointer = new PointerController(this.options.canvas, this.camera, this.model, this.spatialHash, {
@@ -251,7 +241,6 @@ export class Graphium {
       });
     };
     this.physics.onEdgeConflictSolved = energy => this.emit('edgeconflictsolved', { energy });
-    this.bundling.onUpdated = revision => this.emit('bundleupdated', { revision });
     if (this.pointer) {
       const forward = ['click', 'dblclick', 'hover', 'longpress', 'contextmenu', 'drag', 'dragend', 'pan', 'zoom', 'pinch', 'pointerdown', 'pointerup'];
       for (let i = 0; i < forward.length; i++) {
@@ -312,7 +301,6 @@ export class Graphium {
       throw new Error('Graphium node requires an id.');
     }
     const index = this.model.addNode(data.id, data);
-    this.bundling.markDirty();
     this.physics.wake();
     this._manageLabelOnAdd(data.id, data.label);
     return this.model.getNodeSnapshot(index);
@@ -333,14 +321,12 @@ export class Graphium {
     }
     const linkId = data.id ?? `${String(data.source)}:${String(data.target)}:${this.model.linkCount}`;
     const index = this.model.addLink(linkId, data.source, data.target, data);
-    this.bundling.markDirty();
     this.physics.wake();
     return this.model.getLinkSnapshot(index);
   }
   removeNode(id) {
     const result = this.model.removeNode(id);
     if (result) {
-      this.bundling.markDirty();
       this.physics.wake();
       this._manageLabelOnRemove(id);
     }
@@ -349,14 +335,12 @@ export class Graphium {
   removeLink(id) {
     const result = this.model.removeLink(id);
     if (result) {
-      this.bundling.markDirty();
       this.physics.wake();
     }
     return result;
   }
   setData(data) {
     this.model.setData(data);
-    this.bundling.markDirty();
     this.physics.reset();
     this.emit('dataupdated', { nodeCount: this.model.nodeCount, linkCount: this.model.linkCount });
     return this;
@@ -375,7 +359,6 @@ export class Graphium {
       return false;
     }
     this.model.setNodePosition(index, x, y, resetPrevious);
-    this.bundling.markDirty();
     this.physics.wake();
     return true;
   }
@@ -421,7 +404,6 @@ export class Graphium {
       return false;
     }
     this.model.setNodeAppearance(index, appearance);
-    this.bundling.markDirty();
     if (appearance.label !== undefined) {
       const nodeId = this.model.id[index];
       this._manageLabelOnAppearanceChange(nodeId, appearance.label);
@@ -446,7 +428,22 @@ export class Graphium {
   }
   setAppearance(appearance = {}) {
     this.options.appearance = { ...this.options.appearance, ...appearance };
+    this.appearance = { ...this.appearance, ...appearance };
     this.renderer.setAppearance(this.options.appearance);
+    return this;
+  }
+  /**
+   * @brief Enables or disables star rendering for fully connected clusters of 3+ nodes.
+   * @param enabled Whether the edge-star rendering mode is active.
+   * @return {this} This Graphium instance.
+   */
+  setEdgeStar(enabled) {
+    const isEnabled = Boolean(enabled);
+    if (isEnabled && !this._starRoutes) {
+      this._starRoutes = new StarClusterRoutes(this.model);
+    } else if (!isEnabled) {
+      this._starRoutes = null;
+    }
     return this;
   }
   pickLinkAt(worldX, worldY, hitRadius = 7) {
@@ -454,26 +451,27 @@ export class Graphium {
     const tolerance = hitRadius / Math.max(this.camera.zoom, 0.0001);
     let result = -1;
     let best = Infinity;
+    const routes = this._starRoutes;
     for (let link = 0; link < model.linkCount; link++) {
       if (model.linkFlags[link] & 2) {
         continue;
       }
-      const route = this.bundling.getRoute(link);
-      const points = this.bundling.getPointCount(link);
-      const segmentCount = route && points > 1 ? points - 1 : 1;
-      for (let segment = 0; segment < segmentCount; segment++) {
-        const ax = route ? route[segment * 2] : model.x[model.source[link]];
-        const ay = route ? route[segment * 2 + 1] : model.y[model.source[link]];
-        const bx = route ? route[segment * 2 + 2] : model.x[model.target[link]];
-        const by = route ? route[segment * 2 + 3] : model.y[model.target[link]];
-        const dx = bx - ax;
-        const dy = by - ay;
-        const lengthSq = dx * dx + dy * dy;
-        const t = lengthSq > 0 ? Math.max(0, Math.min(1, ((worldX - ax) * dx + (worldY - ay) * dy) / lengthSq)) : 0;
-        const px = ax + dx * t;
-        const py = ay + dy * t;
-        const distance = Math.hypot(worldX - px, worldY - py);
-        const limit = tolerance + model.linkWidth[link] / Math.max(this.camera.zoom, 0.0001);
+      const limit = tolerance + model.linkWidth[link] / Math.max(this.camera.zoom, 0.0001);
+      const route = routes?.getRoute(link);
+      const points = route ? routes.getPointCount(link) : 0;
+      if (route && points > 1) {
+        // Star-routed links follow a polyline; pick against each segment.
+        for (let point = 0; point < points - 1; point++) {
+          const distance = this._distanceToSegment(worldX, worldY, route[point * 2], route[point * 2 + 1], route[point * 2 + 2], route[point * 2 + 3]);
+          if (distance <= limit && distance < best) {
+            result = link;
+            best = distance;
+          }
+        }
+      } else {
+        const sourceIndex = model.source[link];
+        const targetIndex = model.target[link];
+        const distance = this._distanceToSegment(worldX, worldY, model.x[sourceIndex], model.y[sourceIndex], model.x[targetIndex], model.y[targetIndex]);
         if (distance <= limit && distance < best) {
           result = link;
           best = distance;
@@ -481,6 +479,16 @@ export class Graphium {
       }
     }
     return result;
+  }
+
+  _distanceToSegment(worldX, worldY, ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lengthSq = dx * dx + dy * dy;
+    const t = lengthSq > 0 ? Math.max(0, Math.min(1, ((worldX - ax) * dx + (worldY - ay) * dy) / lengthSq)) : 0;
+    const px = ax + dx * t;
+    const py = ay + dy * t;
+    return Math.hypot(worldX - px, worldY - py);
   }
   _setHoveredNode(index) {
     const previous = this._hoveredNode ?? -1;
@@ -517,36 +525,7 @@ export class Graphium {
     return this;
   }
 
-  rebuildEdgeBundles() {
-    this.bundling.rebuild();
-    this._lastRenderedBundleRevision = this.bundling.routeRevision;
-    this.render();
-    return this;
-  }
-  clearEdgeBundles() {
-    this.bundling.clear();
-    this.render();
-    return this;
-  }
-  setBundlingOptions(options = {}) {
-    this.bundling.setOptions(options);
-    this.options = { ...this.options, ...options };
-    return this;
-  }
-  setPhysicsOptions(options = {}) {
-    this.physics.setOptions(options);
-    this.options = { ...this.options, physics: { ...this.options.physics, ...options } };
-    return this;
-  }
-  getEdgeRoute(linkId) {
-    const index = this.model.getLinkIndex(linkId);
-    return index < 0 ? null : this.bundling.getRouteSnapshot(index);
-  }
-  getBundleInfo(linkId) {
-    const index = this.model.getLinkIndex(linkId);
-    return index < 0 ? null : this.bundling.getBundleInfo(index);
-  }
-  getConflictEnergy() {
+      getConflictEnergy() {
     return this.physics.edgeConflictEnergy;
   }
   measureConflictEnergy() {
@@ -558,9 +537,6 @@ export class Graphium {
 
   step(dt) {
     const energy = this.physics.step(dt);
-    if (!this._cameraMoving) {
-      this.bundling.updateIfNeeded();
-    }
     this.render();
     return energy;
   }
@@ -569,10 +545,10 @@ export class Graphium {
       return this;
     }
 
-    if (!this._cameraMoving) {
-      this.bundling.updateIfNeeded();
+    if (this._starRoutes) {
+      this._starRoutes.beginFrame();
     }
-    this.renderer.render(this.model, this.bundling);
+    this.renderer.render(this.model, this._starRoutes);
     this._updateLabelPositions();
     return this;
   }
@@ -649,12 +625,12 @@ export {
   GraphModel,
   SpatialHash2D,
   Physics2D,
-  EdgeBundling2D,
   SegmentGrid,
   EdgeConflictDetector2D,
   Coarsening2D,
   Camera2D,
   WebGLRenderer2D,
+  StarClusterRoutes,
   PointerController,
   NODE_FIXED,
   NODE_SELECTED,

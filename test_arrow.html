@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Graphium · Arrow render check</title>
+  <style>
+    body { margin: 0; background: #0b0d13; }
+    canvas { display: block; width: 900px; height: 600px; }
+  </style>
+</head>
+<body>
+  <canvas id="g" width="900" height="600"></canvas>
+  <script type="module">
+    import { Graphium } from "./src/Graphium.js";
+    const canvas = document.getElementById("g");
+    const graph = new Graphium({
+      canvas,
+      autoStart: false,
+      camera: { x: 0, y: 0, zoom: 1 },
+      appearance: {
+        nodeRadius: 12,
+        nodeVisualRadius: 11,
+        nodeBorderWidth: 0.5,
+        nodeBorderColor: "#ffffff",
+        edgeWidth: 1.2,
+        edgeOpacity: 1,
+        edgeArrowEnabled: true,
+        edgeArrowSize: 14,
+        edgeArrowWidth: 7
+      },
+      renderer: { clearColor: [0.043, 0.051, 0.08, 1], antialias: true }
+    });
+
+    // Pentagon-ish layout with directed links
+    const nodes = ["A", "B", "C", "D", "E", "F"];
+    const angle = i => (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
+    nodes.forEach((n, i) => graph.addNode(n, { x: Math.cos(angle(i)) * 130, y: Math.sin(angle(i)) * 130, label: n }));
+    graph.addLink("A-B", "A", "B", {});              // inherit -> on (global)
+    graph.addLink("A-C", "A", "C", { arrow: false }); // forced off
+    graph.addLink("B-D", "B", "D", { arrow: true, arrowSize: 22, arrowWidth: 10 }); // big
+    graph.addLink("C-E", "C", "E", {});              // inherit -> on
+    graph.addLink("D-F", "D", "F", { arrow: true, arrowSize: 8, arrowWidth: 5 });  // small
+    graph.addLink("E-A", "E", "A", { arrow: true }); 
+    graph.addLink("F-B", "F", "B", {});
+    graph.addLink("C-A", "C", "A", { arrow: false }); // reverse forced off too
+    function resizeRenderer() {
+      graph.renderer.resize(
+        canvas.clientWidth,
+        canvas.clientHeight,
+        globalThis.devicePixelRatio || 1
+      );
+    }
+    resizeRenderer();
+    const resizeObserver = new ResizeObserver(resizeRenderer);
+    resizeObserver.observe(canvas);
+    graph.fit(40);
+    graph.render();
+    window.__graph = graph;
+    console.log("arrowDrawCount(renderer)=", graph.renderer.arrowDrawCount, "linkCount=", graph.linkCount);
+  </script>
+</body>
+</html>

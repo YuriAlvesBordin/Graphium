@@ -165,6 +165,8 @@ export class GraphModel {
       dashPattern: [5, 8],
       dashOffset: 0,
       dashScaleWithZoom: false,
+      arrowSize: 10,
+      arrowWidth: 6,
       ...options.linkDefaults,
     };
     this.nodeCount = 0;
@@ -218,6 +220,9 @@ export class GraphModel {
     this.linkDashGap = new Float32Array(capacity);
     this.linkDashOffset = new Float32Array(capacity);
     this.linkDashWorld = new Uint8Array(capacity);
+    this.linkArrow = new Int8Array(capacity);
+    this.linkArrowSize = new Float32Array(capacity);
+    this.linkArrowWidth = new Float32Array(capacity);
   }
 
   _ensureNodeCapacity(required) {
@@ -273,6 +278,9 @@ export class GraphModel {
     this.linkDashGap = growTyped(this.linkDashGap, capacity, Float32Array);
     this.linkDashOffset = growTyped(this.linkDashOffset, capacity, Float32Array);
     this.linkDashWorld = growTyped(this.linkDashWorld, capacity, Uint8Array);
+    this.linkArrow = growTyped(this.linkArrow, capacity, Int8Array);
+    this.linkArrowSize = growTyped(this.linkArrowSize, capacity, Float32Array);
+    this.linkArrowWidth = growTyped(this.linkArrowWidth, capacity, Float32Array);
     this.linkCapacity = capacity;
   }
 
@@ -403,6 +411,24 @@ export class GraphModel {
 
     if (isNew || options.dashScaleWithZoom !== undefined) {
       this.linkDashWorld[index] = (options.dashScaleWithZoom ?? defaults.dashScaleWithZoom) ? 1 : 0;
+    }
+    // Arrow tri-state: 1 = always on, -1 = always off, 0 = follow global appearance.
+    if (isNew || options.arrow !== undefined) {
+      if (options.arrow === true) {
+        this.linkArrow[index] = 1;
+      } else if (options.arrow === false) {
+        this.linkArrow[index] = -1;
+      } else if (isNew) {
+        this.linkArrow[index] = 0;
+      }
+    }
+
+    if (isNew || options.arrowSize !== undefined) {
+      this.linkArrowSize[index] = Math.max(0, finiteOr(options.arrowSize, defaults.arrowSize));
+    }
+
+    if (isNew || options.arrowWidth !== undefined) {
+      this.linkArrowWidth[index] = Math.max(0, finiteOr(options.arrowWidth, defaults.arrowWidth));
     }
     this.appearanceRevision++;
   }
@@ -539,6 +565,9 @@ export class GraphModel {
       this.linkDashGap[index] = this.linkDashGap[last];
       this.linkDashOffset[index] = this.linkDashOffset[last];
       this.linkDashWorld[index] = this.linkDashWorld[last];
+      this.linkArrow[index] = this.linkArrow[last];
+      this.linkArrowSize[index] = this.linkArrowSize[last];
+      this.linkArrowWidth[index] = this.linkArrowWidth[last];
     }
     this.linkCount--;
     this.topologyRevision++;
@@ -720,6 +749,9 @@ export class GraphModel {
       dashPattern: [this.linkDashLength[index], this.linkDashGap[index]],
       dashOffset: this.linkDashOffset[index],
       dashScaleWithZoom: this.linkDashWorld[index] === 1,
+      arrow: this.linkArrow[index] === 1 ? true : this.linkArrow[index] === -1 ? false : undefined,
+      arrowSize: this.linkArrowSize[index],
+      arrowWidth: this.linkArrowWidth[index],
     };
   }
 }
