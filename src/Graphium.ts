@@ -35,6 +35,7 @@ import { SpatialHash } from './physics/SpatialHash.js';
 import { Camera } from './render/Camera.js';
 import { controlPoint, distanceToEdge } from './render/geometry.js';
 import { LabelLayer } from './render/LabelLayer.js';
+import { RenderLoop } from './render/RenderLoop.js';
 import { Renderer } from './render/Renderer.js';
 import { TextureAtlas } from './render/TextureAtlas.js';
 
@@ -53,20 +54,8 @@ export class Graphium {
   private options: GraphiumOptions;
   private hash: SpatialHash;
   private pointer: PointerController | null = null;
-  private rafActive = false;
-  private rafHandle = 0;
-  private lastTime = 0;
+  private readonly loop: RenderLoop;
   private hoverIndex = -1;
-  private didAutoFit = false;
-  private lastCameraRevision = -1;
-  private lastTopologyRevision = -1;
-  private lastAppearanceRevision = -1;
-  private lastPositionRevision = -1;
-  private lastAtlasRevision = -1;
-  private forceDirty = false;
-  private fps = 60;
-  private frameMs = 16;
-  private physicsMs = 0;
   private linkCounter = 0;
 
   constructor(options: GraphiumOptions = {}) {
@@ -93,6 +82,18 @@ export class Graphium {
     const host = canvas.parentElement ?? document.body;
     this.labels = new LabelLayer(host, this.theme);
     this.labels.attach(this.model, this.camera);
+    this.loop = new RenderLoop({
+      model: this.model,
+      physics: this.physics,
+      camera: this.camera,
+      renderer: this.renderer,
+      labels: this.labels,
+      atlas: this.atlas,
+      isRunning: () => this.running,
+      isDestroyed: () => this.destroyed,
+      autoFit: options.autoFit ?? false,
+      fitView: () => this.fit(),
+    });
     this.wirePointer(canvas);
     this.wireEvents();
     this.resize();
@@ -158,7 +159,7 @@ export class Graphium {
     };
     this.physics.onWake = () => {
       this.events.emit('wake', {});
-      this.scheduleFrame();
+      this.loop.schedule();
     };
     this.events.on('pan', () => this.invalidate());
     this.events.on('zoom', () => this.invalidate());
@@ -275,7 +276,7 @@ export class Graphium {
   setData(data: GraphData): this {
     this.model.setData(data);
     this.physics.reset();
-    this.didAutoFit = false;
+    this.loop.resetAutoFit();
     this.events.emit('dataupdated', { nodeCount: this.model.nodeCount, linkCount: this.model.linkCount });
     this.invalidate();
     return this;
@@ -305,7 +306,7 @@ export class Graphium {
   clear(): this {
     this.model.clear();
     this.physics.reset();
-    this.didAutoFit = false;
+    this.loop.resetAutoFit();
     this.invalidate();
     return this;
   }
@@ -646,90 +647,25 @@ export class Graphium {
 
   /** Advances physics and renders once, returning the kinetic energy. */
   step(dt = 1 / 60): number {
-    const energy = this.physics.step(dt);
-    this.renderFrame();
-    return energy;
+    return this.loop.step(dt);
   }
 
   /** Renders a frame immediately without stepping the simulation. */
   render(): this {
-    this.renderFrame();
+    this.loop.renderNow();
     return this;
   }
 
   /** Requests a render on the next scheduled frame. */
   requestRender(): this {
-    this.forceDirty = true;
-    this.invalidate();
+    this.loop.requestRender();
     return this;
-  }
-
-  /** Performs one render pass and label update with revision bookkeeping. */
-  private renderFrame(): void {
-    if (this.destroyed) {
-      return;
-    }
-    if (this.options.autoFit && !this.didAutoFit && this.model.nodeCount > 0) {
-      this.didAutoFit = true;
-      this.fit();
-    }
-    this.renderer.render(this.model);
-    this.labels.update();
-    this.lastCameraRevision = this.camera.revision;
-    this.lastTopologyRevision = this.model.topologyRevision;
-    this.lastAppearanceRevision = this.model.appearanceRevision;
-    this.lastPositionRevision = this.model.positionRevision;
-    this.lastAtlasRevision = this.atlas.revision;
   }
 
   /** Marks the view dirty and guarantees a scheduled frame. */
   private invalidate(): void {
-    this.scheduleFrame();
+    this.loop.invalidate();
   }
-
-  /** Schedules a loop iteration when none is pending. */
-  private scheduleFrame(): void {
-    if (this.rafActive || this.destroyed) {
-      return;
-    }
-    this.rafActive = true;
-    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 16) as unknown as number;
-    this.rafHandle = raf(this.frame);
-  }
-
-  /** Runs one loop iteration, stepping physics and rendering when dirty. */
-  private frame = (time: number): void => {
-    this.rafActive = false;
-    if (this.destroyed) {
-      return;
-    }
-    const dt = this.lastTime > 0 ? Math.min(0.05, (time - this.lastTime) / 1000) : 1 / 60;
-    this.lastTime = time;
-    const started = performance.now();
-    if (this.running) {
-      this.physics.step(dt);
-    }
-    this.physicsMs = performance.now() - started;
-    const dirty =
-      this.forceDirty ||
-      this.camera.revision !== this.lastCameraRevision ||
-      this.model.topologyRevision !== this.lastTopologyRevision ||
-      this.model.appearanceRevision !== this.lastAppearanceRevision ||
-      this.model.positionRevision !== this.lastPositionRevision ||
-      this.atlas.revision !== this.lastAtlasRevision;
-    this.forceDirty = false;
-    if (dirty) {
-      this.renderFrame();
-    }
-    const frameDuration = performance.now() - started;
-    this.frameMs = this.frameMs * 0.9 + frameDuration * 0.1;
-    this.fps = this.fps * 0.9 + (1 / Math.max(0.001, dt)) * 0.1;
-    if (this.running && !this.physics.sleeping) {
-      this.scheduleFrame();
-    } else {
-      this.lastTime = 0;
-    }
-  };
 
   /** Starts the run loop and returns the graph for chaining. */
   start(): this {
@@ -739,7 +675,7 @@ export class Graphium {
     this.running = true;
     this.physics.wake();
     this.events.emit('start', {});
-    this.scheduleFrame();
+    this.loop.schedule();
     return this;
   }
 
@@ -790,9 +726,9 @@ export class Graphium {
     return {
       nodeCount: this.model.nodeCount,
       linkCount: this.model.linkCount,
-      fps: Math.round(this.fps),
-      frameMs: Math.round(this.frameMs * 100) / 100,
-      physicsMs: Math.round(this.physicsMs * 100) / 100,
+      fps: Math.round(this.loop.fps),
+      frameMs: Math.round(this.loop.frameMs * 100) / 100,
+      physicsMs: Math.round(this.loop.physicsMs * 100) / 100,
       renderMs: Math.round(this.renderer.lastRenderMs * 100) / 100,
       sleeping: this.physics.sleeping,
     };
@@ -800,7 +736,7 @@ export class Graphium {
 
   /** Captures the current canvas contents as a PNG data URL. */
   screenshot(): string {
-    this.renderFrame();
+    this.loop.renderNow();
     return this.renderer.canvas.toDataURL('image/png');
   }
 
@@ -826,9 +762,7 @@ export class Graphium {
     }
     this.destroyed = true;
     this.running = false;
-    if (this.rafHandle && typeof cancelAnimationFrame === 'function') {
-      cancelAnimationFrame(this.rafHandle);
-    }
+    this.loop.cancel();
     this.pointer?.destroy();
     this.labels.destroy();
     this.atlas.onEvent = null;
