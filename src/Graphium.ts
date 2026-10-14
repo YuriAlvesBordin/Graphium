@@ -8,6 +8,7 @@
 
 import { Emitter } from './core/events.js';
 import { FocusController } from './core/FocusController.js';
+import { GraphEditor } from './core/GraphEditor.js';
 import { GraphModel, LINK_HIDDEN, STATE_HOVER, STATE_NORMAL } from './core/GraphModel.js';
 import { LinkHandle, NodeHandle } from './core/handles.js';
 import { SelectionController } from './core/SelectionController.js';
@@ -23,7 +24,6 @@ import type {
   NodeId,
   NodeOptions,
   NodeSnapshot,
-  NodeStateName,
   PhysicsOptions,
   PhysicsPresetName,
   StatsSnapshot,
@@ -49,6 +49,7 @@ export class Graphium {
   readonly renderer: Renderer;
   readonly atlas: TextureAtlas;
   readonly labels: LabelLayer;
+  readonly editor: GraphEditor;
   readonly events = new Emitter();
   theme: ThemeResolved;
   running = false;
@@ -62,7 +63,6 @@ export class Graphium {
   private readonly focusController: FocusController;
   private readonly viewport: ViewportController;
   private hoverIndex = -1;
-  private linkCounter = 0;
 
   constructor(options: GraphiumOptions = {}) {
     this.options = options;
@@ -99,6 +99,13 @@ export class Graphium {
       isDestroyed: () => this.destroyed,
       autoFit: options.autoFit ?? false,
       fitView: () => this.fit(),
+    });
+    this.editor = new GraphEditor({
+      model: this.model,
+      physics: this.physics,
+      events: this.events,
+      resetAutoFit: () => this.loop.resetAutoFit(),
+      invalidate: () => this.invalidate(),
     });
     this.selection = new SelectionController(this.model, () => this.invalidate());
     this.focusController = new FocusController(this.model, () => this.invalidate());
@@ -219,22 +226,13 @@ export class Graphium {
 
   /** Adds one node and returns the graph for chaining. */
   addNode(id: NodeId, options: NodeOptions = {}): this {
-    if (id === undefined || id === null) {
-      throw new Error('Graphium requires a node id.');
-    }
-    this.model.addNode(id, options);
-    this.physics.wake();
-    this.invalidate();
+    this.editor.addNode(id, options);
     return this;
   }
 
   /** Adds many nodes in one call and returns the graph for chaining. */
   addNodes(nodes: Array<NodeOptions & { id: NodeId }>): this {
-    for (let index = 0; index < nodes.length; index++) {
-      this.model.addNode(nodes[index].id ?? index, nodes[index]);
-    }
-    this.physics.wake();
-    this.invalidate();
+    this.editor.addNodes(nodes);
     return this;
   }
 
@@ -244,33 +242,15 @@ export class Graphium {
   link(id: LinkId): LinkHandle | null;
   link(sourceOrId: NodeId, target?: NodeId, options: LinkOptions = {}): this | LinkHandle | null {
     if (target === undefined) {
-      const index = this.model.linkIndexOf(sourceOrId as LinkId);
-      return index < 0 ? null : new LinkHandle(this, this.model.linkIdAt(index) as LinkId);
+      return this.linkById(sourceOrId as LinkId);
     }
-    const autoId = options.id ?? `${String(sourceOrId)}~${String(target)}~${this.linkCounter++}`;
-    this.model.addLink(autoId, sourceOrId, target, options);
-    this.physics.wake();
-    this.invalidate();
-    return this;
-  }
-
-  /** Adds a link with an explicit id, mirroring the legacy signature. */
-  addLink(id: LinkId, source: NodeId, target: NodeId, options: LinkOptions = {}): this {
-    this.model.addLink(id, source, target, options);
-    this.physics.wake();
-    this.invalidate();
+    this.editor.link(sourceOrId, target, options);
     return this;
   }
 
   /** Adds many links in one call and returns the graph for chaining. */
   addLinks(links: Array<LinkOptions & { source: NodeId; target: NodeId }>): this {
-    for (let index = 0; index < links.length; index++) {
-      const config = links[index];
-      const linkId = config.id ?? `${String(config.source)}~${String(config.target)}~${this.linkCounter++}`;
-      this.model.addLink(linkId, config.source, config.target, config);
-    }
-    this.physics.wake();
-    this.invalidate();
+    this.editor.addLinks(links);
     return this;
   }
 
@@ -288,40 +268,23 @@ export class Graphium {
 
   /** Replaces the entire graph with the supplied data payload. */
   setData(data: GraphData): this {
-    this.model.setData(data);
-    this.physics.reset();
-    this.loop.resetAutoFit();
-    this.events.emit('dataupdated', { nodeCount: this.model.nodeCount, linkCount: this.model.linkCount });
-    this.invalidate();
+    this.editor.setData(data);
     return this;
   }
 
   /** Removes one node together with its links. */
   removeNode(id: NodeId): boolean {
-    const removed = this.model.removeNode(id);
-    if (removed) {
-      this.physics.wake();
-      this.invalidate();
-    }
-    return removed;
+    return this.editor.removeNode(id);
   }
 
   /** Removes one link by id. */
   removeLink(id: LinkId): boolean {
-    const removed = this.model.removeLink(id);
-    if (removed) {
-      this.physics.wake();
-      this.invalidate();
-    }
-    return removed;
+    return this.editor.removeLink(id);
   }
 
   /** Removes every node and link while keeping the current theme. */
   clear(): this {
-    this.model.clear();
-    this.physics.reset();
-    this.loop.resetAutoFit();
-    this.invalidate();
+    this.editor.clear();
     return this;
   }
 
@@ -355,91 +318,9 @@ export class Graphium {
     return ids;
   }
 
-  /** Moves a node to a world position. */
-  setNodePosition(id: NodeId | number, x: number, y: number): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index >= 0) {
-      this.model.setNodePosition(index, x, y, true);
-      this.physics.wake();
-      this.invalidate();
-    }
-    return this;
-  }
-
-  /** Locks or unlocks a node in the solver. */
-  setNodeFixed(id: NodeId | number, fixed: boolean): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index >= 0) {
-      this.model.setNodeFixed(index, fixed);
-      this.physics.wake();
-      this.invalidate();
-    }
-    return this;
-  }
-
-  /** Assigns a visual state to a node. */
-  setNodeState(id: NodeId | number, state: NodeStateName): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index >= 0) {
-      this.model.setNodeState(index, state);
-      this.invalidate();
-    }
-    return this;
-  }
-
-  /** Updates node appearance properties. */
-  setNodeAppearance(id: NodeId | number, options: NodeOptions): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index >= 0) {
-      this.model.updateNode(index, options);
-      this.invalidate();
-    }
-    return this;
-  }
-
-  /** Updates link appearance properties. */
-  setLinkAppearance(id: LinkId | number, options: LinkOptions): this {
-    const index = this.model.linkIndexOf(id);
-    if (index >= 0) {
-      this.model.updateLink(index, options);
-      this.invalidate();
-    }
-    return this;
-  }
-
   /** Sets the node image and starts the asynchronous load. */
   setNodeImage(id: NodeId | number, url: string | null, mode: 'cover' | 'contain' = 'cover'): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index >= 0) {
-      this.model.updateNode(index, { image: url, imageMode: mode });
-      this.invalidate();
-    }
-    return this;
-  }
-
-  /** Replaces the custom data object attached to a node. */
-  setNodeData(id: NodeId | number, data: Record<string, unknown>): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index >= 0) {
-      const userData = this.model.nodeUserData(index);
-      for (const key of Object.keys(userData)) {
-        delete userData[key];
-      }
-      Object.assign(userData, data);
-    }
-    return this;
-  }
-
-  /** Replaces the custom data object attached to a link. */
-  setLinkData(id: LinkId | number, data: Record<string, unknown>): this {
-    const index = this.model.linkIndexOf(id);
-    if (index >= 0) {
-      const userData = this.model.linkUserData(index);
-      for (const key of Object.keys(userData)) {
-        delete userData[key];
-      }
-      Object.assign(userData, data);
-    }
+    this.editor.setNodeImage(id, url, mode);
     return this;
   }
 
@@ -654,17 +535,7 @@ export class Graphium {
 
   /** Exports the current graph as a plain JSON friendly object. */
   toJSON(): GraphData {
-    const nodes: Array<NodeOptions & { id: NodeId }> = [];
-    for (let index = 0; index < this.model.nodeCount; index++) {
-      const snapshot = this.model.nodeSnapshot(index);
-      nodes.push({ id: snapshot.id, x: snapshot.x, y: snapshot.y, label: snapshot.label, radius: snapshot.radius, color: snapshot.color, fixed: snapshot.fixed });
-    }
-    const links: Array<LinkOptions & { source: NodeId; target: NodeId }> = [];
-    for (let index = 0; index < this.model.linkCount; index++) {
-      const snapshot = this.model.linkSnapshot(index);
-      links.push({ id: snapshot.id, source: snapshot.source, target: snapshot.target, color: snapshot.color, curvature: snapshot.curvature, width: snapshot.width });
-    }
-    return { nodes, links };
+    return this.editor.toJSON();
   }
 
   /** Releases every resource owned by the instance. */

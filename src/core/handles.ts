@@ -16,19 +16,19 @@ export class NodeHandle {
 
   /** Updates node appearance properties and returns the handle. */
   style(options: NodeOptions): this {
-    this.graph.setNodeAppearance(this.id, options);
+    this.graph.editor.setNodeAppearance(this.id, options);
     return this;
   }
 
   /** Moves the node to a world position and returns the handle. */
   move(x: number, y: number): this {
-    this.graph.setNodePosition(this.id, x, y);
+    this.graph.editor.setNodePosition(this.id, x, y);
     return this;
   }
 
   /** Locks or unlocks the node in the physics solver. */
   fix(fixed = true): this {
-    this.graph.setNodeFixed(this.id, fixed);
+    this.graph.editor.setNodeFixed(this.id, fixed);
     return this;
   }
 
@@ -40,13 +40,13 @@ export class NodeHandle {
 
   /** Assigns a visual state such as hover or disabled. */
   state(name: NodeStateName): this {
-    this.graph.setNodeState(this.id, name);
+    this.graph.editor.setNodeState(this.id, name);
     return this;
   }
 
   /** Sets the label text, or removes it with null. */
   label(text: string | null): this {
-    this.graph.setNodeAppearance(this.id, { label: text });
+    this.graph.editor.setNodeAppearance(this.id, { label: text });
     return this;
   }
 
@@ -58,19 +58,19 @@ export class NodeHandle {
 
   /** Tints the node with a color shortcut. */
   color(color: ColorInput): this {
-    this.graph.setNodeAppearance(this.id, { color });
+    this.graph.editor.setNodeAppearance(this.id, { color });
     return this;
   }
 
   /** Resizes the node with a radius shortcut. */
   radius(value: number): this {
-    this.graph.setNodeAppearance(this.id, { radius: value });
+    this.graph.editor.setNodeAppearance(this.id, { radius: value });
     return this;
   }
 
   /** Attaches or replaces custom user data. */
   data(data: Record<string, unknown>): this {
-    this.graph.setNodeData(this.id, data);
+    this.graph.editor.setNodeData(this.id, data);
     return this;
   }
 
@@ -94,25 +94,25 @@ export class LinkHandle {
 
   /** Updates link appearance properties and returns the handle. */
   style(options: LinkOptions): this {
-    this.graph.setLinkAppearance(this.id, options);
+    this.graph.editor.setLinkAppearance(this.id, options);
     return this;
   }
 
   /** Sets the curvature of the edge in one call. */
   curve(value: number): this {
-    this.graph.setLinkAppearance(this.id, { curvature: value });
+    this.graph.editor.setLinkAppearance(this.id, { curvature: value });
     return this;
   }
 
   /** Switches the edge to a dashed style with an optional pattern. */
   dashed(pattern?: [number, number]): this {
-    this.graph.setLinkAppearance(this.id, { style: 'dashed', dashPattern: pattern });
+    this.graph.editor.setLinkAppearance(this.id, { style: 'dashed', dashPattern: pattern });
     return this;
   }
 
   /** Sets the link color shortcut. */
   color(color: ColorInput): this {
-    this.graph.setLinkAppearance(this.id, { color });
+    this.graph.editor.setLinkAppearance(this.id, { color });
     return this;
   }
 
@@ -124,7 +124,7 @@ export class LinkHandle {
 
   /** Attaches or replaces custom user data. */
   data(data: Record<string, unknown>): this {
-    this.graph.setLinkData(this.id, data);
+    this.graph.editor.setLinkData(this.id, data);
     return this;
   }
 
