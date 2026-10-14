@@ -4,7 +4,8 @@ import type { RenderLoopDeps } from '../../src/render/RenderLoop';
 /**
  * The loop only talks to its collaborators through the deps interface, so
  * the whole scheduling and dirty checking behavior is testable with plain
- * stubs and no DOM or WebGL.
+ * stubs and no DOM or WebGL. The default host is not running, which keeps
+ * the frame loop from rescheduling itself inside tests.
  */
 function createDeps(overrides: Partial<RenderLoopDeps> = {}): RenderLoopDeps {
   return {
@@ -14,7 +15,7 @@ function createDeps(overrides: Partial<RenderLoopDeps> = {}): RenderLoopDeps {
     renderer: { render: jest.fn() } as unknown as RenderLoopDeps['renderer'],
     labels: { update: jest.fn() } as unknown as RenderLoopDeps['labels'],
     atlas: { revision: 0 } as unknown as RenderLoopDeps['atlas'],
-    isRunning: () => true,
+    isRunning: () => false,
     isDestroyed: () => false,
     autoFit: false,
     fitView: jest.fn(),
@@ -23,6 +24,10 @@ function createDeps(overrides: Partial<RenderLoopDeps> = {}): RenderLoopDeps {
 }
 
 describe('RenderLoop', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('should start with the default timing EMAs', () => {
     const loop = new RenderLoop(createDeps());
     expect(loop.fps).toBe(60);
@@ -73,6 +78,42 @@ describe('RenderLoop', () => {
     expect((loop as unknown as { forceDirty: boolean }).forceDirty).toBe(true);
   });
 
+  it('should render a requested frame through the timeout fallback', () => {
+    jest.useFakeTimers();
+    const deps = createDeps();
+    const loop = new RenderLoop(deps);
+    loop.requestRender();
+    expect(deps.renderer.render).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(20);
+    expect(deps.renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not reschedule while the simulation is not running', () => {
+    jest.useFakeTimers();
+    const deps = createDeps();
+    const loop = new RenderLoop(deps);
+    loop.requestRender();
+    jest.advanceTimersByTime(20);
+    jest.advanceTimersByTime(200);
+    expect(deps.renderer.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('should reschedule while running and awake', () => {
+    jest.useFakeTimers();
+    const deps = createDeps({ isRunning: () => true });
+    const loop = new RenderLoop(deps);
+    loop.requestRender();
+    jest.advanceTimersByTime(20);
+    expect(deps.renderer.render).toHaveBeenCalledTimes(1);
+    // Revisions did not change, so the next frame renders nothing, but the
+    // loop must keep a pending frame while the simulation is running.
+    jest.advanceTimersByTime(16);
+    expect(deps.renderer.render).toHaveBeenCalledTimes(1);
+    expect(jest.getTimerCount()).toBe(1);
+    loop.cancel();
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
   it('should not schedule frames once destroyed', () => {
     const deps = createDeps({ isDestroyed: () => true });
     const loop = new RenderLoop(deps);
@@ -80,8 +121,15 @@ describe('RenderLoop', () => {
     expect(deps.renderer.render).not.toHaveBeenCalled();
   });
 
-  it('should cancel pending frames without throwing', () => {
-    const loop = new RenderLoop(createDeps());
-    expect(() => loop.cancel()).not.toThrow();
+  it('should drop the pending timeout frame on cancel', () => {
+    jest.useFakeTimers();
+    const deps = createDeps();
+    const loop = new RenderLoop(deps);
+    loop.requestRender();
+    expect(jest.getTimerCount()).toBe(1);
+    loop.cancel();
+    expect(jest.getTimerCount()).toBe(0);
+    jest.advanceTimersByTime(200);
+    expect(deps.renderer.render).not.toHaveBeenCalled();
   });
 });

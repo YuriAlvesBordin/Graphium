@@ -32,6 +32,7 @@ export class RenderLoop {
   private readonly deps: RenderLoopDeps;
   private rafActive = false;
   private rafHandle = 0;
+  private timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private lastTime = 0;
   private didAutoFit = false;
   private lastCameraRevision = -1;
@@ -86,6 +87,11 @@ export class RenderLoop {
   cancel(): void {
     if (this.rafHandle && typeof cancelAnimationFrame === 'function') {
       cancelAnimationFrame(this.rafHandle);
+      this.rafHandle = 0;
+    }
+    if (this.timeoutHandle !== null) {
+      clearTimeout(this.timeoutHandle);
+      this.timeoutHandle = null;
     }
   }
 
@@ -113,8 +119,11 @@ export class RenderLoop {
       return;
     }
     this.rafActive = true;
-    const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 16) as unknown as number;
-    this.rafHandle = raf(this.frame);
+    if (typeof requestAnimationFrame === 'function') {
+      this.rafHandle = requestAnimationFrame(this.frame);
+    } else {
+      this.timeoutHandle = setTimeout(() => this.frame(performance.now()), 16);
+    }
   }
 
   /** Runs one loop iteration, stepping physics and rendering when dirty. */
