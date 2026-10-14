@@ -58,8 +58,8 @@ export class PointerController {
   private boundLeave = () => this.onLeave();
   private boundContext = (event: MouseEvent) => {
     event.preventDefault();
-    this.updateWorld(event.clientX, event.clientY);
-    this.emit('contextmenu', event, -1);
+    const { screenX, screenY } = this.updateWorld(event.clientX, event.clientY);
+    this.emit('contextmenu', event, -1, -1, screenX, screenY);
   };
 
   constructor(element: HTMLElement, camera: Camera, model: GraphModel, physics: PhysicsEngine, hash: SpatialHash, emitter: Emitter, options: PointerOptions = {}) {
@@ -108,7 +108,7 @@ export class PointerController {
   }
 
   /** Emits a normalized payload to the shared event emitter. */
-  private emit(type: string, originalEvent: PointerEvent | WheelEvent | MouseEvent, nodeIndex: number, linkIndex = -1): void {
+  private emit(type: string, originalEvent: PointerEvent | WheelEvent | MouseEvent, nodeIndex: number, linkIndex = -1, screenX: number = 0, screenY: number = 0): void {
     const payload: PointerEventPayload = {
       type,
       originalEvent,
@@ -116,8 +116,8 @@ export class PointerController {
       nodeId: nodeIndex >= 0 ? this.model.nodeIdAt(nodeIndex) : undefined,
       linkIndex,
       linkId: linkIndex >= 0 ? this.model.linkIdAt(linkIndex) : undefined,
-      screenX: 0,
-      screenY: 0,
+      screenX,
+      screenY,
       worldX: this.world.x,
       worldY: this.world.y,
     };
@@ -138,17 +138,17 @@ export class PointerController {
         this.model.flags[node] |= NODE_DRAGGED | NODE_SELECTED;
         this.model.state[node] = STATE_DRAGGING;
         this.physics.beginDrag(node, this.world.x, this.world.y);
-        this.emit('pointerdown', event, node);
+        this.emit('pointerdown', event, node, -1, position.screenX, position.screenY);
       } else {
         this.dragNode = -1;
         this.activeLink = this.pickLinkAt(this.world.x, this.world.y);
         this.isPanning = this.activeLink < 0 && this.options.panEnabled;
-        this.emit('pointerdown', event, -1, this.activeLink);
+        this.emit('pointerdown', event, -1, this.activeLink, position.screenX, position.screenY);
       }
       clearTimeout(this.longPressTimer);
       this.longPressTimer = window.setTimeout(() => {
         if (!this.moved) {
-          this.emit('longpress', event, this.dragNode);
+          this.emit('longpress', event, this.dragNode, -1, position.screenX, position.screenY);
         }
       }, this.options.longPressMs);
     } else if (this.pointers.size === 2) {
@@ -168,8 +168,8 @@ export class PointerController {
     const tracked = this.pointers.get(event.pointerId);
     if (!tracked) {
       if (this.options.hoverEnabled) {
-        this.updateWorld(event.clientX, event.clientY);
-        this.emit('hover', event, this.pickNode(this.world.x, this.world.y));
+        const position = this.updateWorld(event.clientX, event.clientY);
+        this.emit('hover', event, this.pickNode(this.world.x, this.world.y), -1, position.screenX, position.screenY);
       }
       return;
     }
@@ -196,19 +196,20 @@ export class PointerController {
       this.pinchDistance = distance;
       this.pinchCenterX = centerX;
       this.pinchCenterY = centerY;
-      this.emit('pinch', event, -1);
+      this.emit('pinch', event, -1, -1, position.screenX, position.screenY);
       return;
     }
     if (this.dragNode >= 0) {
       this.physics.dragTo(this.world.x, this.world.y);
-      this.emit('drag', event, this.dragNode);
+      this.emit('drag', event, this.dragNode, -1, position.screenX, position.screenY);
     } else if (this.isPanning) {
       this.camera.pan(-dx, -dy);
-      this.emit('pan', event, -1);
+      this.emit('pan', event, -1, -1, position.screenX, position.screenY);
     }
     if (this.options.hoverEnabled) {
+      const position = this.updateWorld(event.clientX, event.clientY);
       const hovered = this.dragNode >= 0 ? this.dragNode : this.pickNode(this.world.x, this.world.y);
-      this.emit('hover', event, hovered, hovered < 0 ? this.pickLinkAt(this.world.x, this.world.y) : -1);
+      this.emit('hover', event, hovered, hovered < 0 ? this.pickLinkAt(this.world.x, this.world.y) : -1, position.screenX, position.screenY);
     }
   }
 
@@ -234,24 +235,25 @@ export class PointerController {
   private onPointerUp(event: PointerEvent): void {
     this.pointers.delete(event.pointerId);
     clearTimeout(this.longPressTimer);
+    const position = this.updateWorld(event.clientX, event.clientY);
     if (this.dragNode >= 0) {
       const node = this.dragNode;
       this.releaseDrag();
-      this.emit('dragend', event, node);
+      this.emit('dragend', event, node, -1, position.screenX, position.screenY);
       if (!this.moved) {
-        this.emitClick(event, node, -1);
+        this.emitClick(event, node, -1, position.screenX, position.screenY);
       }
       this.dragNode = -1;
     } else if (this.activeLink >= 0) {
       if (!this.moved) {
-        this.emitClick(event, -1, this.activeLink);
+        this.emitClick(event, -1, this.activeLink, position.screenX, position.screenY);
         this.emitter.emit('linkclick', { linkIndex: this.activeLink, linkId: this.model.linkIdAt(this.activeLink) });
       }
       this.activeLink = -1;
     } else if (this.isPanning) {
       this.isPanning = false;
       if (!this.moved) {
-        this.emitClick(event, -1, -1);
+        this.emitClick(event, -1, -1, position.screenX, position.screenY);
       }
     }
     if (this.pointers.size === 0) {
@@ -262,20 +264,20 @@ export class PointerController {
         this.element.releasePointerCapture(event.pointerId);
       } catch {}
     }
-    this.emit('pointerup', event, -1);
+    this.emit('pointerup', event, -1, -1, position.screenX, position.screenY);
   }
 
   /** Emits click or dblclick depending on timing of consecutive clicks. */
-  private emitClick(event: PointerEvent | WheelEvent | MouseEvent, nodeIndex: number, linkIndex: number): void {
+  private emitClick(event: PointerEvent | WheelEvent | MouseEvent, nodeIndex: number, linkIndex: number, screenX: number, screenY: number): void {
     const now = performance.now();
     if (now - this.lastClickTime < 320 && this.lastClickButton === (event as PointerEvent).button) {
       this.lastClickTime = 0;
-      this.emit('dblclick', event, nodeIndex, linkIndex);
+      this.emit('dblclick', event, nodeIndex, linkIndex, screenX, screenY);
       return;
     }
     this.lastClickTime = now;
     this.lastClickButton = (event as PointerEvent).button;
-    this.emit('click', event, nodeIndex, linkIndex);
+    this.emit('click', event, nodeIndex, linkIndex, screenX, screenY);
   }
 
   /** Zooms the view around the wheel position. */
@@ -287,12 +289,12 @@ export class PointerController {
     const position = this.updateWorld(event.clientX, event.clientY);
     const factor = Math.pow(this.options.wheelZoomSpeed, -(event.deltaY || 0) / 100);
     this.camera.zoomAt(factor, position.screenX, position.screenY);
-    this.emit('zoom', event, -1);
+    this.emit('zoom', event, -1, -1, position.screenX, position.screenY);
   }
 
   /** Ends hover tracking when the pointer leaves the canvas. */
   private onLeave(): void {
-    this.emitter.emit('hover', { type: 'hover', nodeIndex: -1, linkIndex: -1, worldX: 0, worldY: 0, screenX: 0, screenY: 0, originalEvent: null } as unknown as PointerEventPayload);
+    this.emit('hover', null as unknown as PointerEvent, -1, -1, 0, 0);
   }
 
   /** Attaches all DOM listeners and activates gesture handling. */
