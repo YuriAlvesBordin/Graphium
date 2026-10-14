@@ -1,311 +1,257 @@
 # Graphium
 
-<p align="center">
-  <strong>The remastered graph visualization library.</strong><br>
-  Silk-smooth physics · WebGL2 rendering · Curved edges · Node images · Fluent TypeScript API
-</p>
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-0074c1.svg)](http://www.typescriptlang.org/)
+[![WebGL2](https://img.shields.io/badge/WebGL2-enabled-ff69b4.svg)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
+[![npm version](https://img.shields.io/npm/v/graphium.svg)](https://www.npmjs.com/package/graphium)
 
-Graphium is a complete rework of the original Graphium engine. Every module was rebuilt around three goals: make the simplest use case a single line of code, make the physics feel buttery and alive, and expose deep customization without ever getting in the way.
+A high-performance WebGL2 graph visualization library with silk-smooth force-directed physics, curved edges, node images, and a fluent TypeScript API.
+
+## Features
+
+- Silk-smooth physics: Velocity-based integration with tuned damping for natural, gliding motion
+- Zero CPU at rest: Render loop stops completely when simulation sleeps; zero idle cost
+- Curved edges: True quadratic Bézier ribbons rendered on GPU with exact normals and dash support
+- Node images: Automatic texture atlasing with CORS-friendly loading and cover/contain framing
+- Focus mode: Dim non-adjacent nodes/links with one call
+- Render on demand: Frames produced only when data changes (topology, appearance, positions, camera, atlas)
+- Pooled labels: DOM pool capped at 400 visible elements, updated with translate3d and culled to viewport
+- Fluent TypeScript API: Chainable methods with intelligent handles for nodes/links
+- Built-in theming: Four themes (midnight, light, slate, sunset) with easy customization
+- Rich event system: Click, drag, zoom, hover, sleep/wake, image load/error, and more
+- Camera controls: Fit, center, zoom, reboot, screenshot, export/import
+- TypeScript first: Full type definitions with zero runtime dependencies
+
+## Installation
+
+```bash
+# npm
+npm install graphium
+
+# Yarn
+yarn add graphium
+
+# pnpm
+pnpm add graphium
+```
+
+## Quick Start
 
 ```ts
 import { Graphium } from 'graphium';
 
-const graph = Graphium.create({ theme: { name: 'midnight' } });
-
-graph
-  .addNode('alice', { label: 'Alice' })
-  .addNode('bob', { label: 'Bob' })
-  .addNode('carol', { label: 'Carol' })
-  .link('alice', 'bob')
-  .link('bob', 'carol')
-  .link('carol', 'alice')
-  .fit();
-```
-
-That is the entire setup. The canvas is created for you, the simulation starts on its own, the view fits your graph, and when the layout settles the engine puts itself to sleep to save battery.
-
----
-
-## Why the remaster feels different
-
-| Area | What changed |
-|------|--------------|
-| **Physics feel** | Velocity based integration with tuned damping, so nodes glide instead of twitch. Dragging now uses a soft follower: the node chases your pointer with a slight elastic lag, and when you release, it keeps the pointer momentum and flies. |
-| **Silence** | The render loop stops completely when the simulation sleeps. Nothing animates, nothing draws, zero CPU. Any interaction or data change wakes everything up instantly. |
-| **Curved edges** | Every link accepts a `curvature` value rendered as a true quadratic bezier ribbon, tessellated on the GPU with exact tangent normals, dash arc lengths and arrow tangents. |
-| **Node images** | Pass an URL or data URL to any node. Images are downloaded asynchronously, packed into a 1024 px texture atlas with cover or contain framing and mixed over the node fill, all on the GPU. |
-| **Focus mode** | One call dims every node and link that is not adjacent to your target, with labels hidden for dimmed nodes. |
-| **Render on demand** | Frames are only produced when revisions change: topology, appearance, positions, camera or atlas. |
-| **Pooled labels** | Labels live in a recycled DOM pool capped at 400 visible elements, updated with `translate3d` and culled to the viewport. |
-
----
-
-## Installation
-
-### npm
-
-```bash
-npm install graphium
-```
-
-### From source
-
-```bash
-git clone <your-repo> graphium
-cd graphium
-npm install
-npm run build
-```
-
-The build emits plain ES modules into `dist/` with full `.d.ts` declarations. No bundler is required to consume the library.
-
-### Browser direct
-
-```html
-<script type="module">
-  import { Graphium } from './dist/index.js';
-</script>
-```
-
----
-
-## The fluent API
-
-Every mutation returns the graph instance, so calls chain naturally. Handles give individual nodes and links their own chains.
-
-```ts
+// Create instance
 const graph = Graphium.create({
-  canvas: document.querySelector('#stage'),   // or container, or nothing for auto canvas
+  container: document.getElementById('stage'), // or container, or nothing for auto canvas
   autoStart: true,                            // run the simulation immediately
   autoFit: true,                              // frame the graph when data appears
   physics: { preset: 'silk' },
   theme: { name: 'midnight' },
 });
 
+// Add data
 graph
   .addNodes([
-    { id: 'a', label: 'Alpha' },
-    { id: 'b', label: 'Beta' },
-    { id: 'c', label: 'Gamma' },
+    { id: 'alice', label: 'Alice' },
+    { id: 'bob',   label: 'Bob'   },
+    { id: 'carol', label: 'Carol' },
   ])
   .addLinks([
-    { source: 'a', target: 'b' },
-    { source: 'b', target: 'c', curvature: 0.4 },
+    { source: 'alice', target: 'bob' },
+    { source: 'bob',   target: 'carol' },
+    { source: 'carol', target: 'alice' },
   ]);
 
-graph.node('a').style({ radius: 18, color: '#ff6b6b' }).fix();
-graph.link('a~b~0').curve(0.6).dashed([4, 6]);
+// Optional: customize nodes/links
+graph.node('alice').style({ radius: 18, color: '#ff6b6b' }).fix();
+graph.link('alice~bob~0').curve(0.4).dashed([4, 2]);
+
+// Fit view
+graph.fit(80);
 ```
 
-### Handles
+## Documentation
+
+### Guides
+
+- [Getting Started](./docs/getting-started.md) - Introduction to Graphium with basic examples
+- [Physics Configuration](./docs/physics-configuration.md) - Tuning the force-directed physics engine
+- [Theming Guide](./docs/theming-guide.md) - Customizing colors, styles, and appearance
+- [Node Images](./docs/node-images.md) - Using images as node backgrounds
+- [Events & Interaction](./docs/events-interaction.md) - Handling user input and responding to events
+- [Performance Tuning](./docs/performance-tuning.md) - Optimizing for speed and efficiency
+
+## Usage Patterns
+
+### Fluent API with Handles
 
 ```ts
-graph.node('a')
-  .move(100, 50)          // set position
-  .fix()                  // lock in the solver
-  .image('./face.png')    // set a node image
-  .label('Alpha!')        // change the label
-  .color('#4ecdc4')       // shortcut for style color
-  .select();              // mark selected
-
-graph.linkById('e1')
-  .curve(-0.5)            // bow the other way
-  .width(2.5)
+// Node handle chain
+graph.node('user123')
+  .move(100, 200)
+  .fix()
+  .image('/avatars/user123.png')
+  .label('Alice')
+  .color('#4ecdc4')
   .select();
 
-graph.node('a').remove(); // handles also remove
+// Link handle chain
+graph.linkById('link1')
+  .curve(-0.3)
+  .width(2.5)
+  .color('#51586b')
+  .select();
 ```
 
-### Data at once
+### Bulk Operations
 
 ```ts
+// Add many nodes/links at once
 graph.setData({
   nodes: [
-    { id: 'x', label: 'X' },
-    { id: 'y', label: 'Y' },
+    { id: 'a', label: 'A', x: 0, y: 0 },
+    { id: 'b', label: 'B', x: 100, y: 100 },
+    // ...
   ],
-  links: [{ source: 'x', target: 'y' }],
+  links: [
+    { source: 'a', target: 'b', curvature: 0.2 },
+    // ...
+  ]
+});
+
+// Replace all data
+graph.setData(newData);
+```
+
+### Event Handling
+
+```ts
+// Node click
+graph.on('click', e => {
+  console.log('Clicked node:', e.nodeId);
+  console.log('World coords:', e.worldX, e.worldY);
+});
+
+// Drag end with momentum
+graph.on('dragend', e => {
+  console.log(`Released ${e.nodeId} with velocity`, e.vx, e.vy);
+});
+
+// Sleep/wake events
+graph.on('sleep', () => console.log('Layout settled'));
+graph.on('wake',  () => console.log('Layout started'));
+```
+
+### Camera & View
+
+```ts
+// Frame everything with padding
+graph.fit(80); // 80% padding
+
+// Move view center
+graph.centerOn(0, 0);
+
+// Absolute zoom
+graph.zoomTo(2);  // 2x
+
+// Relative zoom
+graph.zoomBy(1.5); // 1.5x current
+
+// Screenshot (returns PNG data URL)
+const img = graph.screenshot();
+```
+
+### Cleanup
+
+```ts
+// Release all resources
+graph.destroy();
+```
+
+## Configuration
+
+### Physics Options
+
+```ts
+graph.setPhysics({
+  repulsion: 1100,          // Node-node repulsion strength
+  repulsionRadius: 200,     // Distance cutoff for repulsion
+  springStrength: 0.055,    // Link spring force multiplier
+  gravity: 0.0022,          // Pull toward origin
+  damping: 0.92,            // Velocity retention per frame
+  maxSpeed: 900,            // Velocity clamp
+  collisionStrength: 0.85,  // Node overlap repulsion
+  positionIterations: 2,    // Constraint solver passes
+  temperature: 0.7,         // Initial simulation heat
+  cooling: 0.99,            // Heat decay per frame
+  minTemperature: 0.05,     // Heat floor
+  sleepEnergy: 0.0004,      // Velocity threshold for sleep
+  sleepFrames: 48,          // Calm frames required to sleep
+  maxNeighbors: 128,        // Repulsion neighbor cap
+  edgeSeparation: 0.45,     // Edge crossing untangler (0 disables)
+  dragSmooth: 0.42,         // Drag follower elasticity
+  throwFactor: 1,           // Momentum multiplier on release
 });
 ```
 
----
-
-## Physics
-
-The engine combines four ingredients: center gravity, hash accelerated pairwise repulsion, spring forces along links and iterative constraint passes for spring length and collision separation. A soft edge crossing resolver gently untangles overlapping edges over time.
-
-### Presets
-
-| Preset | Character |
-|--------|-----------|
-| `silk` | The default. Smooth accelerations, high damping, graceful settles. |
-| `bouncy` | Lower damping and stronger springs for overshoot and playful wobble. |
-| `crystal` | Stiff springs, extra constraint iterations, snap into rigid arrangements. |
-| `liquid` | Heavy damping, soft springs, floating drift, slow motion. |
+### Theming
 
 ```ts
-graph.usePreset('bouncy');
-graph.usePreset('silk', { repulsion: 1500 });   // preset plus overrides
-graph.setPhysics({ damping: 0.95 });            // live tweak, wakes the engine
-```
-
-### Full physics options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `repulsion` | 1100 | Strength of pairwise node repulsion. |
-| `repulsionRadius` | 200 | Distance window for repulsion and the hash cell size. |
-| `springStrength` | 0.055 | Global multiplier on link spring forces. |
-| `gravity` | 0.0022 | Pull toward the world origin. |
-| `damping` | 0.92 | Velocity retention per 60 fps frame. Higher glides longer. |
-| `maxSpeed` | 900 | Velocity clamp that keeps motion elegant. |
-| `collisionStrength` | 0.85 | How hard overlapping nodes push apart. |
-| `positionIterations` | 2 | Constraint solver passes per frame. |
-| `temperature` | 0.7 | Initial simulation heat, scaled into forces. |
-| `cooling` | 0.99 | Heat decay per frame. |
-| `minTemperature` | 0.05 | Floor for the heat so graphs keep breathing slightly. |
-| `sleepEnergy` | 0.0004 | Mean squared velocity below which the graph may sleep. |
-| `sleepFrames` | 48 | Consecutive calm frames required before sleeping. |
-| `maxNeighbors` | 128 | Repulsion neighbor cap per node per frame. |
-| `edgeSeparation` | 0.45 | Strength of the crossing untangler, 0 disables it. |
-| `dragSmooth` | 0.42 | Drag follower elasticity per frame. |
-| `throwFactor` | 1 | Momentum multiplier applied on release. |
-
----
-
-## Theming
-
-Four built in themes ship with the library: `midnight`, `light`, `slate` and `sunset`. Apply one by name or compose your own from any subset of values.
-
-```ts
+// Use built-in theme
 graph.setTheme({ name: 'sunset' });
 
+// Custom theme
 graph.setTheme({
-  background: '#101418',
-  node: { radius: 12, borderWidth: 3, colorPalette: ['#e060a0', '#60b0ff'] },
+  background: '#0b0e14',
+  node: { 
+    radius: 12, 
+    borderWidth: 2, 
+    colorPalette: ['#ff6b6b', '#4ecdc4', '#ffe66d'] 
+  },
   edge: { color: '#51586b', curvature: 0.25, arrowEnabled: true },
-  hoverRing: { color: '#ffffff', width: 3 },
-  selectedRing: { color: '#ffd166', width: 4 },
   label: { size: 13, color: '#e8ecf5', background: 'rgba(0,0,0,0.4)' },
+  hoverRing: { color: '#ffffff', width: 3 },
+  selectedRing: { color: '#ffd166', width: 4 }
 });
 ```
 
-Theme values merge over the current theme, so partial updates never reset the rest. New nodes pick colors deterministically from `colorPalette`, giving every id a stable color without configuration.
-
----
-
-## Node images
-
-```ts
-graph.addNode('alice', { image: 'https://example.com/alice.png' });
-graph.setNodeImage('bob', localDataUrl, 'contain');
-await graph.loadImages();   // resolves when every pending image settles
-```
-
-Images render through a texture atlas. Requests are deduplicated by URL, loaded with CORS friendly settings, drawn into a cell with cover or contain framing and uploaded in one texture update. Failed loads fall back to the node fill color and emit an `imageerror` event.
-
----
-
-## Interaction and events
-
-Drag nodes with momentum, pan by dragging the background, zoom with the wheel, pinch on touch, hover for a highlight ring, click to select and focus, long press and double click are all built in.
-
-```ts
-graph.on('click', event => {
-  console.log('clicked', event.nodeId, event.worldX, event.worldY);
-});
-
-graph.on('dragend', event => {
-  console.log('released with momentum', event.nodeId);
-});
-
-graph.on('sleep', () => console.log('layout settled'));
-graph.on('imageload', event => console.log('image ready', event.url));
-
-const stop = graph.on('zoom', () => {});
-stop();   // unsubscribe
-```
-
-Events: `click`, `dblclick`, `longpress`, `contextmenu`, `hover`, `drag`, `dragend`, `pan`, `zoom`, `pinch`, `pointerdown`, `pointerup`, `sleep`, `wake`, `start`, `stop`, `imageload`, `imageerror`, `dataupdated`.
-
-Interaction can be tuned or disabled per gesture:
-
-```ts
-graph.setInteraction({ zoomEnabled: false, wheelZoomSpeed: 1.2 });
-```
-
----
-
-## Camera, focus and utilities
-
-```ts
-graph.fit(80);                  // frame everything with padding
-graph.centerOn(0, 0);           // move the view center
-graph.zoomTo(2);                // absolute zoom
-graph.zoomBy(1.25);             // relative zoom
-
-graph.focus('alice');           // dim everything not adjacent to alice
-graph.unfocus();                // restore
-
-graph.selectNode('alice');      // exclusive selection
-graph.selectNode('bob', true, true);   // additive selection
-graph.selectedNodes();          // ['alice']
-
-graph.reboot();                 // restart the layout from current heat
-graph.stats();                  // fps, timings, sleeping state
-graph.screenshot();             // PNG data URL of the current frame
-graph.toJSON();                 // plain object export
-graph.loadImages();             // promise for pending image loads
-graph.destroy();                // release everything
-```
-
----
-
-## Performance notes
-
-- Storage is fully data oriented: positions, velocities, colors and flags live in TypedArrays and the hot loops allocate nothing.
-- The spatial hash uses open addressing with intrusive chains, rebuilt in place each step.
-- Rendering uses three instanced draws per frame: straight edge quads, tessellated curved ribbons and node discs with atlas images.
-- The loop sleeps completely at rest and renders only when revisions change, which keeps idle cost at zero.
-- Labels are pooled, viewport culled and capped, so large graphs never thrash the DOM.
-- On typical desktop hardware the target of 10 to 20 thousand nodes holds 60 fps with the default configuration; tune `repulsionRadius` and `maxNeighbors` for your graph shape.
-
----
-
-## Migration from previous versions
-
-| Previous version | Current version (Graphium) |
-|------------------|----------------------------|
-| `new Graphium({ canvas })` | `Graphium.create({ canvas })` or the same constructor |
-| `addLink(id, source, target, opts)` returns a snapshot | returns the graph; use `getLink(id)` for the snapshot |
-| `setNodeAppearance(id, opts)` | still available, plus `node(id).style(opts)` |
-| `edgeStar` mode | replaced by per link `curvature` |
-| `edgeconflict` events | replaced by the automatic `edgeSeparation` resolver |
-| labels as separate DOM divs per node | pooled label layer with theme options |
-| manual resize handling | automatic through `autoResize` |
-
-The legacy method names `addLink`, `setNodeAppearance`, `setLinkAppearance`, `setNodePosition`, `setNodeFixed`, `setNodeState`, `selectNode`, `selectLink`, `getNode`, `getLink`, `setData`, `removeNode`, `removeLink`, `on`, `off`, `emit`, `start`, `stop`, `fit`, `step`, `render` and `destroy` all still exist with chainable returns.
-
----
-
-## Demo
-
-Open `demo/index.html` through any static server:
+## Building from Source
 
 ```bash
-npx serve .
+# Clone repository
+git clone https://github.com/YuriAlvesBordin/Graphium.git
+cd Graphium
+
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Outputs to ./dist/
+# - index.js (ES module)
+# - index.d.ts (TypeScript declarations)
+# - sourcemaps included
 ```
 
-The playground includes live physics sliders, the four presets, four themes, three generated datasets, node count control, curvature control, image toggles and a click inspector.
+### Development
 
----
+```bash
+# Watch mode (rebuild on changes)
+npm run watch
 
-## Browser support
-
-WebGL2 is required. Chrome 56+, Firefox 51+, Safari 15+, Edge 79+.
-
----
+# Run demo
+npm run demo
+```
 
 ## License
 
-MIT.
+Graphium is MIT licensed. See [LICENSE](./LICENSE) for details.
+
+## Acknowledgements
+
+- Inspired by force-directed graph layout algorithms
+- Thanks to the open-source WebGL2 and TypeScript communities
+- Built with love using modern web technologies
+
+Happy graphing!

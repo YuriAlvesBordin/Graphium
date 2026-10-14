@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Graphium 2 Playground</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #0b0e14;
+      color: #c9d2e3;
+      font: 13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    #stage { position: relative; width: 100vw; height: 100vh; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .panel {
+      position: absolute;
+      z-index: 2;
+      top: 16px;
+      right: 16px;
+      width: 292px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: rgba(17, 21, 30, 0.92);
+      border: 1px solid #232a38;
+      border-radius: 14px;
+      padding: 14px 16px 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+    .panel::-webkit-scrollbar { width: 8px; }
+    .panel::-webkit-scrollbar-thumb { background: #2a3242; border-radius: 4px; }
+    h1 {
+      margin: 0 0 2px;
+      font-size: 15px;
+      font-weight: 650;
+      color: #f0f3f9;
+      letter-spacing: 0.2px;
+    }
+    h1 span { color: #4f8ef7; }
+    .subtitle { margin: 0 0 12px; font-size: 11px; color: #77839a; }
+    .section { margin-top: 14px; }
+    .section-title {
+      font-size: 10px;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #5d6a82;
+      margin-bottom: 8px;
+    }
+    .row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .chip {
+      flex: 1 1 auto;
+      padding: 6px 10px;
+      border: 1px solid #2a3242;
+      border-radius: 8px;
+      background: #161b26;
+      color: #aeb9cd;
+      font-size: 11.5px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .chip:hover { border-color: #3c485e; background: #1b2230; }
+    .chip.active { border-color: #4f8ef7; background: rgba(79, 142, 247, 0.14); color: #dfe9ff; }
+    .slider-row { margin-bottom: 9px; }
+    .slider-row label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: #8b97ad;
+      margin-bottom: 3px;
+    }
+    .slider-row label b { color: #d7deeb; font-weight: 600; font-variant-numeric: tabular-nums; }
+    input[type="range"] {
+      width: 100%;
+      height: 4px;
+      appearance: none;
+      background: #232a38;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #4f8ef7;
+      border: 2px solid #0b0e14;
+      box-shadow: 0 0 0 1px #4f8ef7;
+    }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 12px; color: #aeb9cd; }
+    .switch { position: relative; width: 34px; height: 19px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .track {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      background: #232a38;
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .track::before {
+      content: "";
+      position: absolute;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      background: #77839a;
+      transition: all 0.15s ease;
+    }
+    .switch input:checked + .track { background: rgba(79, 142, 247, 0.35); }
+    .switch input:checked + .track::before { transform: translateX(15px); background: #4f8ef7; }
+    .actions { display: flex; gap: 8px; margin-top: 10px; }
+    .btn {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid #2a3242;
+      border-radius: 9px;
+      background: #161b26;
+      color: #d7deeb;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { border-color: #3c485e; background: #1b2230; }
+    .btn.primary { border-color: #2f6ae0; background: #2f6ae0; color: #fff; }
+    .btn.primary:hover { background: #3d78f0; }
+    .stats {
+      position: absolute;
+      z-index: 2;
+      left: 16px;
+      bottom: 16px;
+      display: flex;
+      gap: 14px;
+      padding: 9px 14px;
+      background: rgba(17, 21, 30, 0.88);
+      border: 1px solid #232a38;
+      border-radius: 10px;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: #8b97ad;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+    .stats b { color: #e8edf6; font-weight: 650; }
+    .hint {
+      position: absolute;
+      z-index: 2;
+      left: 16px;
+      top: 16px;
+      padding: 9px 14px;
+      background: rgba(17, 21, 30, 0.88);
+      border: 1px solid #232a38;
+      border-radius: 10px;
+      font-size: 11px;
+      color: #77839a;
+      pointer-events: none;
+      backdrop-filter: blur(8px);
+    }
+    .hint b { color: #aeb9cd; font-weight: 600; }
+    #inspector {
+      position: absolute;
+      z-index: 2;
+      right: 16px;
+      bottom: 16px;
+      width: 292px;
+      padding: 12px 14px;
+      background: rgba(17, 21, 30, 0.92);
+      border: 1px solid #232a38;
+      border-radius: 12px;
+      font-size: 12px;
+      backdrop-filter: blur(10px);
+      display: none;
+    }
+    #inspector .name { font-weight: 650; color: #f0f3f9; font-size: 13px; margin-bottom: 4px; }
+    #inspector .meta { color: #8b97ad; display: flex; justify-content: space-between; }
+    #inspector .close { position: absolute; top: 8px; right: 10px; cursor: pointer; color: #5d6a82; font-size: 14px; line-height: 1; }
+    #inspector .close:hover { color: #aeb9cd; }
+    @media (max-width: 760px) {
+      .panel { width: calc(100vw - 32px); max-height: 46vh; }
+      #inspector { width: calc(100vw - 32px); }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div class="hint"><b>Drag</b> nodes with momentum &nbsp;·&nbsp; <b>Wheel</b> zooms &nbsp;·&nbsp; <b>Click</b> focuses a node</div>
+    <div class="stats">
+      <span>FPS <b id="statFps">60</b></span>
+      <span>Nodes <b id="statNodes">0</b></span>
+      <span>Links <b id="statLinks">0</b></span>
+      <span>Physics <b id="statPhysics">0.0 ms</b></span>
+      <span>State <b id="statState">running</b></span>
+    </div>
+    <div id="inspector">
+      <span class="close" id="inspectorClose">×</span>
+      <div class="name" id="inspectorName">Node</div>
+      <div class="meta"><span>Links</span><b id="inspectorDegree">0</b></div>
+      <div class="meta"><span>Position</span><b id="inspectorPosition">0, 0</b></div>
+      <div class="meta"><span>Velocity</span><b id="inspectorVelocity">0, 0</b></div>
+    </div>
+    <div class="panel">
+      <h1>Graphium <span>2</span></h1>
+      <p class="subtitle">Silk-smooth WebGL2 graph playground</p>
+
+      <div class="section">
+        <div class="section-title">Physics preset</div>
+        <div class="row" id="presetRow"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Live tuning</div>
+        <div class="slider-row"><label>Repulsion <b id="valRepulsion"></b></label><input type="range" id="sldRepulsion" min="200" max="2600" step="50"></div>
+        <div class="slider-row"><label>Spring strength <b id="valSpring"></b></label><input type="range" id="sldSpring" min="0.01" max="0.25" step="0.005"></div>
+        <div class="slider-row"><label>Damping <b id="valDamping"></b></label><input type="range" id="sldDamping" min="0.7" max="0.985" step="0.005"></div>
+        <div class="slider-row"><label>Gravity <b id="valGravity"></b></label><input type="range" id="sldGravity" min="0" max="0.012" step="0.0005"></div>
+        <div class="slider-row"><label>Edge curvature <b id="valCurvature"></b></label><input type="range" id="sldCurvature" min="-0.8" max="0.8" step="0.05"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Scene</div>
+        <div class="row" id="datasetRow"></div>
+        <div class="slider-row" style="margin-top:10px"><label>Node count <b id="valCount"></b></label><input type="range" id="sldCount" min="20" max="600" step="10"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Theme</div>
+        <div class="row" id="themeRow"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Display</div>
+        <div class="toggle-row"><span>Node images</span><label class="switch"><input type="checkbox" id="tglImages" checked><span class="track"></span></label></div>
+        <div class="toggle-row"><span>Arrows</span><label class="switch"><input type="checkbox" id="tglArrows"><span class="track"></span></label></div>
+        <div class="toggle-row"><span>Labels</span><label class="switch"><input type="checkbox" id="tglLabels" checked><span class="track"></span></label></div>
+        <div class="toggle-row"><span>Pause physics</span><label class="switch"><input type="checkbox" id="tglPause"><span class="track"></span></label></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="btnFit">Fit view</button>
+        <button class="btn" id="btnShake">Shake</button>
+        <button class="btn primary" id="btnRebuild">Rebuild</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.__demoErrors = [];
+    window.addEventListener("error", event => {
+      window.__demoErrors.push(String(event.message) + " @" + String(event.filename) + ":" + String(event.lineno) + ":" + String(event.colno));
+    });
+    window.addEventListener("unhandledrejection", event => {
+      window.__demoErrors.push("rejection: " + String(event.reason && event.reason.message ? event.reason.message : event.reason));
+    });
+  </script>
+  <script type="module">
+    import { Graphium, BUILT_IN_THEMES, presetNames } from "../dist/index.js";
+
+    const palette = ["#ff6b6b", "#4ecdc4", "#ffe66d", "#95e1d3", "#f38181", "#aa96da", "#fcbad3", "#a8d8ea"];
+
+    function makeAvatar(seed, text) {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 96;
+      const ctx = canvas.getContext("2d");
+      const hue = (seed * 67) % 360;
+      const gradient = ctx.createLinearGradient(0, 0, 96, 96);
+      gradient.addColorStop(0, `hsl(${hue}, 65%, 55%)`);
+      gradient.addColorStop(1, `hsl(${(hue + 50) % 360}, 70%, 40%)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 96, 96);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.font = "700 42px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 48, 52);
+      return canvas.toDataURL("image/png");
+    }
+
+    function buildClusters(count) {
+      const nodes = [];
+      const links = [];
+      const clusterCount = 6;
+      const perCluster = Math.max(4, Math.round(count / clusterCount));
+      let seed = 1;
+      const random = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+      for (let cluster = 0; cluster < clusterCount; cluster++) {
+        for (let member = 0; member < perCluster; member++) {
+          const id = `n${cluster}_${member}`;
+          const angle = (member / perCluster) * Math.PI * 2 + cluster;
+          const distance = 110 + random() * 60;
+          nodes.push({
+            id,
+            label: `${String.fromCharCode(65 + cluster)}${member}`,
+            x: Math.cos(angle) * distance + (cluster % 3 - 1) * 320,
+            y: Math.sin(angle) * distance + (Math.floor(cluster / 3) - 0.5) * 320,
+            color: palette[cluster % palette.length],
+          });
+          const anchor = `n${cluster}_${Math.floor(random() * member)}`;
+          if (member > 0) {
+            links.push({ source: id, target: anchor });
+          }
+        }
+        for (let extra = 0; extra < 3; extra++) {
+          const a = `n${cluster}_${Math.floor(random() * perCluster)}`;
+          const b = `n${cluster}_${Math.floor(random() * perCluster)}`;
+          if (a !== b) {
+            links.push({ source: a, target: b });
+          }
+        }
+      }
+      for (let bridge = 0; bridge < clusterCount; bridge++) {
+        const next = (bridge + 1) % clusterCount;
+        links.push({
+          source: `n${bridge}_0`,
+          target: `n${next}_0`,
+          width: 1.8,
+        });
+      }
+      return { nodes, links };
+    }
+
+    function buildNetwork(count) {
+      const nodes = [];
+      const links = [];
+      let seed = 7;
+      const random = () => {
+        seed = (seed * 48271) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+      for (let index = 0; index < count; index++) {
+        const id = `v${index}`;
+        nodes.push({
+          id,
+          label: `V${index}`,
+          color: index < 3 ? palette[index] : undefined,
+        });
+        if (index > 0) {
+          const attachTo = Math.floor(Math.pow(random(), 1.6) * index);
+          links.push({ source: id, target: `v${attachTo}`, strength: 1.1 });
+          if (random() > 0.72 && index > 3) {
+            const second = Math.floor(random() * index);
+            if (second !== attachTo) {
+              links.push({ source: id, target: `v${second}` });
+            }
+          }
+        }
+      }
+      return { nodes, links };
+    }
+
+    function buildTree(depth) {
+      const nodes = [];
+      const links = [];
+      const spread = Math.pow(2, depth);
+      let counter = 0;
+      const walk = (level, x, y, parentId) => {
+        const id = `t${counter++}`;
+        nodes.push({
+          id,
+          label: `L${level}`,
+          x: x + (randomOffset() * 12),
+          y: y + (randomOffset() * 12),
+          color: palette[level % palette.length],
+        });
+        if (parentId !== null) {
+          links.push({ source: parentId, target: id });
+        }
+        if (level < depth) {
+          const gap = spread / Math.pow(2, level + 1);
+          walk(level + 1, x - gap, y + 92, id);
+          walk(level + 1, x + gap, y + 92, id);
+        }
+      };
+      let seedState = 3;
+      const randomOffset = () => {
+        seedState = (seedState * 16807) % 2147483647;
+        return ((seedState - 1) / 2147483646 - 0.5) * 2;
+      };
+      walk(0, 0, -260, null);
+      return { nodes, links };
+    }
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "midnight" },
+      camera: { minZoom: 0.05, maxZoom: 12 },
+    });
+
+    const state = {
+      dataset: "clusters",
+      count: 120,
+      images: true,
+      curvature: 0,
+      preset: "silk",
+    };
+
+    function loadDataset(name, count) {
+      state.dataset = name;
+      state.count = count;
+      const data = name === "network" ? buildNetwork(count) : name === "tree" ? buildTree(6) : buildClusters(count);
+      graph.setData(data);
+      applyImages();
+      applyCurvature(state.curvature);
+      graph.setPhysics({ edgeSeparation: name === "tree" ? 0 : 0.45 });
+      graph.fit(70);
+      updateDatasetChips();
+    }
+
+    function applyImages() {
+      const snapshot = graph.toJSON();
+      snapshot.nodes.forEach((node, index) => {
+        if (state.images) {
+          graph.setNodeImage(node.id, makeAvatar(index, String.fromCharCode(65 + (index % 26))), "cover");
+        } else {
+          graph.setNodeImage(node.id, null);
+        }
+      });
+    }
+
+    function applyCurvature(value) {
+      state.curvature = value;
+      const model = graph.model;
+      for (let index = 0; index < model.linkCount; index++) {
+        model.linkCurvature[index] = value;
+      }
+      graph.requestRender();
+    }
+
+    const presetRow = document.getElementById("presetRow");
+    presetNames().forEach(name => {
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      chip.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      chip.dataset.preset = name;
+      chip.addEventListener("click", () => {
+        state.preset = name;
+        graph.usePreset(name);
+        syncSliders();
+        updatePresetChips();
+      });
+      presetRow.appendChild(chip);
+    });
+
+    function updatePresetChips() {
+      for (const chip of presetRow.children) {
+        chip.classList.toggle("active", chip.dataset.preset === state.preset);
+      }
+    }
+
+    const datasetRow = document.getElementById("datasetRow");
+    [["clusters", "Clusters"], ["network", "Network"], ["tree", "Tree"]].forEach(([name, label]) => {
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      chip.textContent = label;
+      chip.dataset.dataset = name;
+      chip.addEventListener("click", () => loadDataset(name, state.count));
+      datasetRow.appendChild(chip);
+    });
+
+    function updateDatasetChips() {
+      for (const chip of datasetRow.children) {
+        chip.classList.toggle("active", chip.dataset.dataset === state.dataset);
+      }
+    }
+
+    const themeRow = document.getElementById("themeRow");
+    Object.keys(BUILT_IN_THEMES).forEach(name => {
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      chip.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      chip.dataset.theme = name;
+      chip.addEventListener("click", () => {
+        graph.setTheme({ name });
+        updateThemeChips();
+      });
+      themeRow.appendChild(chip);
+    });
+
+    function updateThemeChips() {
+      for (const chip of themeRow.children) {
+        chip.classList.toggle("active", chip.dataset.theme === currentTheme);
+      }
+    }
+
+    let currentTheme = "midnight";
+    const originalSetTheme = graph.setTheme.bind(graph);
+    graph.setTheme = options => {
+      if (options && options.name) {
+        currentTheme = options.name;
+      }
+      originalSetTheme(options);
+      updateThemeChips();
+      return graph;
+    };
+
+    function bindSlider(id, valueId, format, onChange) {
+      const slider = document.getElementById(id);
+      const value = document.getElementById(valueId);
+      slider.addEventListener("input", () => {
+        const parsed = Number(slider.value);
+        value.textContent = format(parsed);
+        onChange(parsed);
+      });
+      return { slider, value, format };
+    }
+
+    const repulsionControl = bindSlider("sldRepulsion", "valRepulsion", v => String(v), v => graph.setPhysics({ repulsion: v }));
+    const springControl = bindSlider("sldSpring", "valSpring", v => v.toFixed(3), v => graph.setPhysics({ springStrength: v }));
+    const dampingControl = bindSlider("sldDamping", "valDamping", v => v.toFixed(3), v => graph.setPhysics({ damping: v }));
+    const gravityControl = bindSlider("sldGravity", "valGravity", v => v.toFixed(4), v => graph.setPhysics({ gravity: v }));
+    const curvatureControl = bindSlider("sldCurvature", "valCurvature", v => v.toFixed(2), applyCurvature);
+    const countControl = bindSlider("sldCount", "valCount", v => String(v), v => {
+      state.count = v;
+    });
+    countControl.slider.addEventListener("change", () => loadDataset(state.dataset, state.count));
+
+    function syncSliders() {
+      const physics = graph.physics.options;
+      repulsionControl.slider.value = physics.repulsion;
+      repulsionControl.value.textContent = physics.repulsion;
+      springControl.slider.value = physics.springStrength;
+      springControl.value.textContent = physics.springStrength.toFixed(3);
+      dampingControl.slider.value = physics.damping;
+      dampingControl.value.textContent = physics.damping.toFixed(3);
+      gravityControl.slider.value = physics.gravity;
+      gravityControl.value.textContent = physics.gravity.toFixed(4);
+      curvatureControl.slider.value = state.curvature;
+      curvatureControl.value.textContent = state.curvature.toFixed(2);
+      countControl.slider.value = state.count;
+      countControl.value.textContent = state.count;
+    }
+
+    document.getElementById("tglImages").addEventListener("change", event => {
+      state.images = event.target.checked;
+      applyImages();
+    });
+
+    document.getElementById("tglArrows").addEventListener("change", event => {
+      graph.setTheme({ edge: { arrowEnabled: event.target.checked } });
+    });
+
+    document.getElementById("tglLabels").addEventListener("change", event => {
+      graph.setTheme({ label: { enabled: event.target.checked } });
+    });
+
+    document.getElementById("tglPause").addEventListener("change", event => {
+      if (event.target.checked) {
+        graph.stop();
+      } else {
+        graph.start();
+      }
+    });
+
+    document.getElementById("btnFit").addEventListener("click", () => graph.fit(70));
+    document.getElementById("btnRebuild").addEventListener("click", () => loadDataset(state.dataset, state.count));
+    document.getElementById("btnShake").addEventListener("click", () => {
+      const model = graph.model;
+      for (let index = 0; index < model.nodeCount; index++) {
+        model.vx[index] += (Math.random() - 0.5) * 400;
+        model.vy[index] += (Math.random() - 0.5) * 400;
+      }
+      graph.reboot();
+    });
+
+    const inspector = document.getElementById("inspector");
+    document.getElementById("inspectorClose").addEventListener("click", () => {
+      inspector.style.display = "none";
+      graph.unfocus();
+    });
+
+    graph.on("click", event => {
+      if (event.nodeIndex >= 0) {
+        const snapshot = graph.model.nodeSnapshot(event.nodeIndex);
+        inspector.style.display = "block";
+        document.getElementById("inspectorName").textContent = String(snapshot.id);
+        document.getElementById("inspectorDegree").textContent = String(snapshot.degree);
+        graph.focus(snapshot.id);
+        graph.fit(140);
+      } else {
+        inspector.style.display = "none";
+        graph.unfocus();
+      }
+    });
+
+    graph.on("dblclick", () => {
+      inspector.style.display = "none";
+      graph.unfocus();
+    });
+
+    const statFps = document.getElementById("statFps");
+    const statNodes = document.getElementById("statNodes");
+    const statLinks = document.getElementById("statLinks");
+    const statPhysics = document.getElementById("statPhysics");
+    const statState = document.getElementById("statState");
+    setInterval(() => {
+      const stats = graph.stats();
+      statFps.textContent = String(stats.fps);
+      statNodes.textContent = String(stats.nodeCount);
+      statLinks.textContent = String(stats.linkCount);
+      statPhysics.textContent = stats.physicsMs.toFixed(1) + " ms";
+      statState.textContent = graph.running ? (stats.sleeping ? "sleeping" : "running") : "paused";
+      statState.style.color = stats.sleeping ? "#34d399" : graph.running ? "#fbbf24" : "#77839a";
+    }, 400);
+
+    updatePresetChips();
+    updateDatasetChips();
+    updateThemeChips();
+    syncSliders();
+    loadDataset("clusters", 120);
+    window.graph = graph;
+  </script>
+</body>
+</html>
