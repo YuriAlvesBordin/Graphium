@@ -40,6 +40,7 @@ import { LabelLayer } from './render/LabelLayer.js';
 import { RenderLoop } from './render/RenderLoop.js';
 import { Renderer } from './render/Renderer.js';
 import { TextureAtlas } from './render/TextureAtlas.js';
+import { ViewportController } from './render/ViewportController.js';
 
 export class Graphium {
   readonly model: GraphModel;
@@ -59,6 +60,7 @@ export class Graphium {
   private readonly loop: RenderLoop;
   private readonly selection: SelectionController;
   private readonly focusController: FocusController;
+  private readonly viewport: ViewportController;
   private hoverIndex = -1;
   private linkCounter = 0;
 
@@ -100,6 +102,12 @@ export class Graphium {
     });
     this.selection = new SelectionController(this.model, () => this.invalidate());
     this.focusController = new FocusController(this.model, () => this.invalidate());
+    this.viewport = new ViewportController({
+      model: this.model,
+      camera: this.camera,
+      renderer: this.renderer,
+      invalidate: () => this.invalidate(),
+    });
     this.wirePointer(canvas);
     this.wireEvents();
     this.resize();
@@ -521,54 +529,31 @@ export class Graphium {
 
   /** Scales the view so the whole graph fits with padding. */
   fit(padding = 60): this {
-    const model = this.model;
-    if (model.nodeCount === 0) {
-      return this;
-    }
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (let index = 0; index < model.nodeCount; index++) {
-      const radius = model.visualRadius[index];
-      minX = Math.min(minX, model.x[index] - radius);
-      minY = Math.min(minY, model.y[index] - radius);
-      maxX = Math.max(maxX, model.x[index] + radius);
-      maxY = Math.max(maxY, model.y[index] + radius);
-    }
-    this.camera.fit(minX, minY, maxX, maxY, padding);
-    this.invalidate();
+    this.viewport.fit(padding);
     return this;
   }
 
   /** Centers the view on a world point. */
   centerOn(x: number, y: number): this {
-    this.camera.setPosition(x, y);
-    this.invalidate();
+    this.viewport.centerOn(x, y);
     return this;
   }
 
   /** Multiplies the current zoom level. */
   zoomBy(factor: number): this {
-    this.camera.setZoom(this.camera.zoom * factor);
-    this.invalidate();
+    this.viewport.zoomBy(factor);
     return this;
   }
 
   /** Sets an absolute zoom level. */
   zoomTo(zoom: number): this {
-    this.camera.setZoom(zoom);
-    this.invalidate();
+    this.viewport.zoomTo(zoom);
     return this;
   }
 
   /** Resizes the renderer to the canvas client size. */
   resize(): this {
-    const canvas = this.renderer.canvas;
-    const width = canvas.clientWidth || canvas.width || 1;
-    const height = canvas.clientHeight || canvas.height || 1;
-    this.renderer.resize(width, height, window.devicePixelRatio || 1);
-    this.invalidate();
+    this.viewport.resize();
     return this;
   }
 
@@ -645,7 +630,7 @@ export class Graphium {
 
   /** Returns the world position under a screen position. */
   screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
-    return this.camera.screenToWorld(screenX, screenY, { x: 0, y: 0 });
+    return this.viewport.screenToWorld(screenX, screenY);
   }
 
   /** Returns a performance statistics snapshot for dashboards. */
