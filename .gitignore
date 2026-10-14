@@ -31,3 +31,6 @@ coverage/
 *.local
 .env
 .env.local
+
+# ZCode internal files (should not be committed)
+.zcode/
