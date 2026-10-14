@@ -9,7 +9,7 @@
 import { Emitter } from './core/events.js';
 import { FocusController } from './core/FocusController.js';
 import { GraphEditor } from './core/GraphEditor.js';
-import { GraphModel, LINK_HIDDEN, STATE_HOVER, STATE_NORMAL } from './core/GraphModel.js';
+import { GraphModel } from './core/GraphModel.js';
 import { LinkHandle, NodeHandle } from './core/handles.js';
 import { SelectionController } from './core/SelectionController.js';
 import { resolveTheme } from './core/theme.js';
@@ -30,12 +30,11 @@ import type {
   ThemeOptions,
   ThemeResolved,
 } from './core/types.js';
-import { PointerController } from './interaction/PointerController.js';
+import { InteractionBinder } from './interaction/InteractionBinder.js';
 import { PhysicsEngine } from './physics/PhysicsEngine.js';
 import { PRESETS } from './physics/presets.js';
-import { SpatialHash } from './physics/SpatialHash.js';
 import { Camera } from './render/Camera.js';
-import { controlPoint, distanceToEdge } from './render/geometry.js';
+import { controlPoint } from './render/geometry.js';
 import { LabelLayer } from './render/LabelLayer.js';
 import { RenderLoop } from './render/RenderLoop.js';
 import { Renderer } from './render/Renderer.js';
@@ -56,13 +55,11 @@ export class Graphium {
   destroyed = false;
 
   private options: GraphiumOptions;
-  private hash: SpatialHash;
-  private pointer: PointerController | null = null;
   private readonly loop: RenderLoop;
   private readonly selection: SelectionController;
   private readonly focusController: FocusController;
   private readonly viewport: ViewportController;
-  private hoverIndex = -1;
+  private readonly binder: InteractionBinder;
 
   constructor(options: GraphiumOptions = {}) {
     this.options = options;
@@ -73,8 +70,7 @@ export class Graphium {
       theme: this.theme,
     });
     this.physics = new PhysicsEngine(this.model, options.physics ?? {});
-    this.hash = this.physics.hash;
-    this.hash.setCellSize(this.physics.options.repulsionRadius);
+    this.physics.hash.setCellSize(this.physics.options.repulsionRadius);
     this.camera = new Camera(options.camera ?? {});
     const canvas = options.canvas ?? (options.container ? createCanvasIn(options.container) : createCanvasIn(document.body));
     this.renderer = new Renderer(canvas, this.theme, options.renderer ?? {});
@@ -115,8 +111,17 @@ export class Graphium {
       renderer: this.renderer,
       invalidate: () => this.invalidate(),
     });
-    this.wirePointer(canvas);
-    this.wireEvents();
+    this.binder = new InteractionBinder({
+      canvas,
+      model: this.model,
+      physics: this.physics,
+      camera: this.camera,
+      hash: this.physics.hash,
+      events: this.events,
+      interaction: options.interaction,
+      selection: this.selection,
+      invalidate: () => this.invalidate(),
+    });
     this.resize();
     if (typeof ResizeObserver !== 'undefined' && (options.autoResize ?? true)) {
       new ResizeObserver(() => this.resize()).observe(canvas);
@@ -151,77 +156,6 @@ export class Graphium {
   emit<T = unknown>(type: string, payload: T): this {
     this.events.emit(type, payload);
     return this;
-  }
-
-  /** Builds the pointer controller when interaction is not disabled. */
-  private wirePointer(canvas: HTMLCanvasElement): void {
-    const interaction = this.options.interaction;
-    if (interaction === false) {
-      return;
-    }
-    const settings: InteractionOptions = interaction === true || interaction === undefined ? {} : interaction;
-    this.pointer = new PointerController(canvas, this.camera, this.model, this.physics, this.hash, this.events, {
-      wheelZoomSpeed: settings.wheelZoomSpeed,
-      dragThreshold: settings.dragThreshold,
-      longPressMs: settings.longPressMs,
-      linkHitRadius: settings.linkHitRadius,
-      hoverEnabled: settings.hoverEnabled,
-      panEnabled: settings.panEnabled,
-      zoomEnabled: settings.zoomEnabled,
-      dragEnabled: settings.dragEnabled,
-      pickLink: (worldX, worldY, radius) => this.pickLinkAt(worldX, worldY, radius),
-    });
-  }
-
-  /** Connects library internal reactions to emitter traffic. */
-  private wireEvents(): void {
-    this.physics.onSleep = energy => {
-      this.events.emit('sleep', { energy });
-    };
-    this.physics.onWake = () => {
-      this.events.emit('wake', {});
-      this.loop.schedule();
-    };
-    this.events.on('pan', () => this.invalidate());
-    this.events.on('zoom', () => this.invalidate());
-    this.events.on('pinch', () => this.invalidate());
-    this.events.on('hover', payload => {
-      const event = payload as unknown as { nodeIndex?: number };
-      this.setHover(typeof event.nodeIndex === 'number' ? event.nodeIndex : -1);
-      this.invalidate();
-    });
-    this.events.on('click', payload => {
-      const event = payload as unknown as { nodeIndex: number; linkIndex: number };
-      if (event.linkIndex >= 0) {
-        this.selectLink(event.linkIndex, true);
-      } else if (event.nodeIndex >= 0) {
-        this.selectNode(event.nodeIndex, true);
-      } else {
-        this.clearSelection();
-      }
-      this.invalidate();
-    });
-    this.events.on('drag', () => {
-      this.physics.wake();
-      this.invalidate();
-    });
-    this.events.on('dragend', () => this.invalidate());
-    this.events.on('imageload', () => this.invalidate());
-  }
-
-  /** Updates the hovered node and keeps the previous one consistent. */
-  private setHover(index: number): void {
-    const previous = this.hoverIndex;
-    if (previous === index) {
-      return;
-    }
-    if (previous >= 0 && this.model.state[previous] === STATE_HOVER) {
-      this.model.state[previous] = STATE_NORMAL;
-    }
-    this.hoverIndex = index;
-    if (index >= 0 && this.model.state[index] === STATE_NORMAL) {
-      this.model.state[index] = STATE_HOVER;
-    }
   }
 
   /** Adds one node and returns the graph for chaining. */
@@ -383,22 +317,20 @@ export class Graphium {
   /** Updates physics options live and wakes the simulation. */
   setPhysics(options: PhysicsOptions): this {
     this.physics.setOptions(options);
-    this.hash.setCellSize(this.physics.options.repulsionRadius);
+    this.physics.hash.setCellSize(this.physics.options.repulsionRadius);
     return this;
   }
 
   /** Applies a named physics preset with optional overrides. */
   usePreset(name: PhysicsPresetName, overrides: PhysicsOptions = {}): this {
     this.physics.usePreset(name, overrides);
-    this.hash.setCellSize(this.physics.options.repulsionRadius);
+    this.physics.hash.setCellSize(this.physics.options.repulsionRadius);
     return this;
   }
 
   /** Updates interaction options on the live pointer controller. */
   setInteraction(options: InteractionOptions): this {
-    if (this.pointer) {
-      Object.assign(this.pointer.options, options);
-    }
+    this.binder.setInteraction(options);
     return this;
   }
 
@@ -489,24 +421,7 @@ export class Graphium {
 
   /** Finds the link index closest to a world position within a radius. */
   pickLinkAt(worldX: number, worldY: number, hitRadius = 8): number {
-    const model = this.model;
-    const tolerance = hitRadius / Math.max(this.camera.zoom, 0.0001);
-    let best = -1;
-    let bestDistance = Infinity;
-    for (let link = 0; link < model.linkCount; link++) {
-      if (model.linkFlags[link] & LINK_HIDDEN) {
-        continue;
-      }
-      const source = model.source[link];
-      const target = model.target[link];
-      const distance = distanceToEdge(worldX, worldY, model.x[source], model.y[source], model.x[target], model.y[target], model.linkCurvature[link]);
-      const limit = tolerance + model.linkWidth[link] / Math.max(this.camera.zoom, 0.0001);
-      if (distance <= limit && distance < bestDistance) {
-        best = link;
-        bestDistance = distance;
-      }
-    }
-    return best;
+    return this.binder.pickLinkAt(worldX, worldY, hitRadius);
   }
 
   /** Returns the world position under a screen position. */
@@ -546,7 +461,7 @@ export class Graphium {
     this.destroyed = true;
     this.running = false;
     this.loop.cancel();
-    this.pointer?.destroy();
+    this.binder.destroy();
     this.labels.destroy();
     this.atlas.onEvent = null;
     this.renderer.destroy();
