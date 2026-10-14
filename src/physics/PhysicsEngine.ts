@@ -362,9 +362,6 @@ export class PhysicsEngine {
         const invA = fixedA ? 0 : 1 / Math.max(0.0001, model.mass[a]);
         const invB = fixedB ? 0 : 1 / Math.max(0.0001, model.mass[b]);
         const total = invA + invB;
-        if (total === 0) {
-          continue;
-        }
         const correction = (((distance - model.restLength[link]) / distance) * 0.28 * model.linkStrength[link]) / total;
         const cx = dx * correction;
         const cy = dy * correction;
@@ -405,9 +402,6 @@ export class PhysicsEngine {
           const invI = 1 / Math.max(0.0001, model.mass[index]);
           const invJ = 1 / Math.max(0.0001, model.mass[other]);
           const total = invI + invJ;
-          if (total === 0) {
-            continue;
-          }
           const correction = ((minDistance - distance) / distance) * 0.5 * options.collisionStrength;
           model.x[index] -= (dx * correction * invI) / total;
           model.y[index] -= (dy * correction * invI) / total;

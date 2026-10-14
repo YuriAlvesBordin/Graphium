@@ -133,3 +133,34 @@ describe('RenderLoop', () => {
     expect(deps.renderer.render).not.toHaveBeenCalled();
   });
 });
+
+describe('RenderLoop rAF and teardown branches', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    delete (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame;
+    delete (globalThis as { cancelAnimationFrame?: unknown }).cancelAnimationFrame;
+  });
+
+  it('should prefer requestAnimationFrame when available and cancel through it', () => {
+    const raf = jest.fn(() => 42);
+    const caf = jest.fn();
+    (globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = raf;
+    (globalThis as { cancelAnimationFrame?: unknown }).cancelAnimationFrame = caf;
+    const deps = createDeps();
+    const loop = new RenderLoop(deps);
+    loop.requestRender();
+    expect(raf).toHaveBeenCalled();
+    loop.cancel();
+    expect(caf).toHaveBeenCalledWith(42);
+  });
+
+  it('should stop immediately when a frame lands after destroy', () => {
+    let destroyed = false;
+    const deps = createDeps({ isDestroyed: () => destroyed });
+    const loop = new RenderLoop(deps);
+    destroyed = true;
+    loop.renderNow();
+    expect(deps.renderer.render).not.toHaveBeenCalled();
+    expect(() => (loop as unknown as { frame: (time: number) => void }).frame(1000)).not.toThrow();
+  });
+});

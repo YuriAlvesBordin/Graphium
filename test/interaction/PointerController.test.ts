@@ -6,6 +6,18 @@ import { PhysicsEngine } from '../../src/physics/PhysicsEngine';
 import { SpatialHash } from '../../src/physics/SpatialHash';
 import { DEFAULT_THEME } from '../../src/core/theme';
 
+// The controller defers long press detection through window.setTimeout, so a
+// module level stub keeps every describe block working (unref'd so pending
+// timers never hold the Jest worker open).
+(globalThis as unknown as { window: unknown }).window = {
+  setTimeout: (fn: () => void, ms: number) => {
+    const handle = setTimeout(fn, ms);
+    (handle as unknown as { unref?: () => void }).unref?.();
+    return handle;
+  },
+  clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),
+};
+
 type Handler = (event: unknown) => void;
 
 interface StubCanvas {
@@ -66,22 +78,6 @@ function createHarness() {
 }
 
 describe('PointerController', () => {
-  beforeAll(() => {
-    // The controller defers long press detection through window.setTimeout.
-    (globalThis as unknown as { window: unknown }).window = {
-      setTimeout: (fn: () => void, ms: number) => {
-        const handle = setTimeout(fn, ms);
-        (handle as unknown as { unref?: () => void }).unref?.();
-        return handle;
-      },
-      clearTimeout: (id: unknown) => clearTimeout(id as ReturnType<typeof setTimeout>),
-    };
-  });
-
-  afterAll(() => {
-    delete (globalThis as unknown as { window?: unknown }).window;
-  });
-
   it('should register every gesture listener on enable', () => {
     const { canvas } = createHarness();
     for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerleave', 'wheel', 'contextmenu']) {
@@ -381,4 +377,72 @@ describe('PointerController', () => {
 /** Physics normally rebuilds the hash every step; tests must do it manually. */
 function physicsHashRebuild(harness: { model: GraphModel; physics: PhysicsEngine }): void {
   harness.physics.hash.rebuild(harness.model.x, harness.model.y, harness.model.nodeCount);
+}
+
+describe('PointerController remaining branches', () => {
+  it('should grow the pick buffer when the graph exceeds its capacity', () => {
+    const harness = createHarness();
+    const { canvas, model, physics } = harness;
+    for (let i = 0; i < 300; i++) {
+      model.addNode(`n${i}`, { x: i * 5, y: 0, radius: 4 });
+    }
+    physics.hash.rebuild(model.x, model.y, model.nodeCount);
+    // The node sits at world (1500, 0) = screen (1900, 200); the initial
+    // 256 entry pick buffer must grow before picking succeeds.
+    canvas.fire('pointermove', pointerEvent({ clientX: 1900, clientY: 250 }));
+    const seen: Array<Record<string, unknown>> = [];
+    events_on(harness, 'hover', payload => seen.push(payload as Record<string, unknown>));
+    canvas.fire('pointermove', pointerEvent({ clientX: 1900, clientY: 250 }));
+    expect(seen.length).toBe(1);
+    expect(seen[0].nodeIndex).toBe(280);
+  });
+
+  it('should drop an active drag when a second pointer lands', () => {
+    const harness = createHarness();
+    const { canvas, model, events } = harness;
+    model.addNode('grab', { x: 0, y: 0, radius: 40 });
+    physicsHashRebuild(harness);
+    const endDragSpy = jest.spyOn(harness.physics, 'endDrag');
+    canvas.fire('pointerdown', pointerEvent({ pointerId: 1, clientX: 500, clientY: 250 }));
+    expect((model.flags[0] & NODE_DRAGGED) === 0).toBe(false);
+    canvas.fire('pointerdown', pointerEvent({ pointerId: 2, clientX: 700, clientY: 250 }));
+    expect(endDragSpy).toHaveBeenCalled();
+    expect((model.flags[0] & NODE_DRAGGED) === 0).toBe(true);
+  });
+
+  it('should tolerate a third pointer landing after the drag was released', () => {
+    const harness = createHarness();
+    const { canvas, model } = harness;
+    model.addNode('grab', { x: 0, y: 0, radius: 40 });
+    physicsHashRebuild(harness);
+    canvas.fire('pointerdown', pointerEvent({ pointerId: 1, clientX: 500, clientY: 250 }));
+    canvas.fire('pointerdown', pointerEvent({ pointerId: 2, clientX: 700, clientY: 250 }));
+    // dragNode is already -1; releasing again exercises the guard.
+    expect(() => canvas.fire('pointerdown', pointerEvent({ pointerId: 3, clientX: 750, clientY: 250 }))).not.toThrow();
+  });
+
+  it('should ignore enable twice and disable twice', () => {
+    const harness = createHarness();
+    const { canvas, controller } = harness;
+    const countBefore = canvas.handlers.size;
+    controller.enable();
+    expect(canvas.handlers.size).toBe(countBefore);
+    controller.disable();
+    controller.disable();
+    expect(canvas.handlers.size).toBe(0);
+  });
+
+  it('should fully release resources on destroy', () => {
+    const harness = createHarness();
+    const { canvas, controller } = harness;
+    controller.destroy();
+    expect(controller.enabled).toBe(false);
+    expect(canvas.handlers.size).toBe(0);
+    canvas.fire('pointerdown', pointerEvent({ clientX: 500, clientY: 250 }));
+  });
+});
+
+/** Attaches an event listener through the exposed graph emitter. */
+function events_on(harness: { events: Emitter }, type: string, listener: (payload: unknown) => void): () => void {
+  return harness.events.on(type, listener);
 }

@@ -208,3 +208,25 @@ describe('GraphEditor', () => {
     expect(exported.links[0].color).toBe(0xff0000ff);
   });
 });
+
+describe('GraphEditor remaining branches', () => {
+  it('should clear previous keys when replacing link data', () => {
+    const model = new GraphModel({ nodeCapacity: 8, linkCapacity: 8, theme: DEFAULT_THEME });
+    const physics = new PhysicsEngine(model, {});
+    const editor = new GraphEditor({ model, physics, events: new Emitter(), resetAutoFit: () => {}, invalidate: () => {} });
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 5, y: 0 });
+    editor.link('a', 'b', {});
+    editor.setLinkData('a~b~0', { first: 1 });
+    editor.setLinkData('a~b~0', { second: 2 });
+    expect(model.linkSnapshot(0).data).toEqual({ second: 2 });
+  });
+
+  it('should ignore element updates for missing ids', () => {
+    const model = new GraphModel({ nodeCapacity: 8, linkCapacity: 8, theme: DEFAULT_THEME });
+    const physics = new PhysicsEngine(model, {});
+    const editor = new GraphEditor({ model, physics, events: new Emitter(), resetAutoFit: () => {}, invalidate: () => {} });
+    expect(() => editor.setNodeAppearance('missing', { label: 'x' })).not.toThrow();
+    expect(() => editor.setNodeImage('missing', 'x.png')).not.toThrow();
+  });
+});

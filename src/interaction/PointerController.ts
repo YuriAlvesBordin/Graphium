@@ -220,9 +220,6 @@ export class PointerController {
   /** Clears drag flags and lets the physics engine keep the momentum. */
   private releaseDrag(): void {
     const node = this.dragNode;
-    if (node < 0) {
-      return;
-    }
     this.model.flags[node] &= ~NODE_DRAGGED;
     if (this.model.state[node] === STATE_DRAGGING) {
       this.model.state[node] = 2;

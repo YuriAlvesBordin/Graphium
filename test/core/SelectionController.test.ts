@@ -80,3 +80,14 @@ describe('SelectionController', () => {
     expect(controller.selectedLinks().length).toBe(1);
   });
 });
+
+describe('SelectionController link guards', () => {
+  it('should ignore unknown link ids and out of range indexes', () => {
+    const model = new GraphModel({ nodeCapacity: 8, linkCapacity: 8, theme: DEFAULT_THEME });
+    const controller = new SelectionController(model, () => {});
+    model.addNode('a', {});
+    controller.selectLink('missing', true);
+    controller.selectLink(0, true);
+    expect(controller.selectedLinks()).toEqual([]);
+  });
+});
