@@ -7,8 +7,10 @@
  */
 
 import { Emitter } from './core/events.js';
-import { GraphModel, LINK_HIDDEN, LINK_SELECTED, NODE_DIM, LINK_DIM, NODE_SELECTED, STATE_HOVER, STATE_NORMAL } from './core/GraphModel.js';
+import { FocusController } from './core/FocusController.js';
+import { GraphModel, LINK_HIDDEN, STATE_HOVER, STATE_NORMAL } from './core/GraphModel.js';
 import { LinkHandle, NodeHandle } from './core/handles.js';
+import { SelectionController } from './core/SelectionController.js';
 import { resolveTheme } from './core/theme.js';
 import { BUILT_IN_THEMES } from './core/themes.js';
 import type {
@@ -55,6 +57,8 @@ export class Graphium {
   private hash: SpatialHash;
   private pointer: PointerController | null = null;
   private readonly loop: RenderLoop;
+  private readonly selection: SelectionController;
+  private readonly focusController: FocusController;
   private hoverIndex = -1;
   private linkCounter = 0;
 
@@ -94,6 +98,8 @@ export class Graphium {
       autoFit: options.autoFit ?? false,
       fitView: () => this.fit(),
     });
+    this.selection = new SelectionController(this.model, () => this.invalidate());
+    this.focusController = new FocusController(this.model, () => this.invalidate());
     this.wirePointer(canvas);
     this.wireEvents();
     this.resize();
@@ -431,120 +437,41 @@ export class Graphium {
 
   /** Selects one node, optionally keeping the current selection. */
   selectNode(id: NodeId | number, selected: boolean = true, additive = false): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index < 0) {
-      return this;
-    }
-    if (selected && !additive) {
-      this.clearNodeSelection();
-    }
-    this.model.setNodeSelected(index, selected);
-    this.invalidate();
+    this.selection.selectNode(id, selected, additive);
     return this;
   }
 
   /** Selects one link, optionally keeping the current selection. */
   selectLink(id: LinkId | number, selected: boolean = true, additive = false): this {
-    const index = this.model.linkIndexOf(id);
-    if (index < 0) {
-      return this;
-    }
-    if (selected && !additive) {
-      this.clearLinkSelection();
-    }
-    this.model.setLinkSelected(index, selected);
-    this.invalidate();
+    this.selection.selectLink(id, selected, additive);
     return this;
   }
 
   /** Clears the selection of every node and link. */
   clearSelection(): this {
-    this.clearNodeSelection();
-    this.clearLinkSelection();
-    this.invalidate();
+    this.selection.clear();
     return this;
-  }
-
-  /** Deselects every node. */
-  private clearNodeSelection(): void {
-    for (let index = 0; index < this.model.nodeCount; index++) {
-      if (this.model.flags[index] & NODE_SELECTED) {
-        this.model.setNodeSelected(index, false);
-      }
-    }
-  }
-
-  /** Deselects every link. */
-  private clearLinkSelection(): void {
-    for (let index = 0; index < this.model.linkCount; index++) {
-      if (this.model.linkFlags[index] & LINK_SELECTED) {
-        this.model.setLinkSelected(index, false);
-      }
-    }
   }
 
   /** Returns the ids of every selected node. */
   selectedNodes(): NodeId[] {
-    const ids: NodeId[] = [];
-    for (let index = 0; index < this.model.nodeCount; index++) {
-      if (this.model.flags[index] & NODE_SELECTED) {
-        ids.push(this.model.nodeIdAt(index) as NodeId);
-      }
-    }
-    return ids;
+    return this.selection.selectedNodes();
   }
 
   /** Returns the ids of every selected link. */
   selectedLinks(): LinkId[] {
-    const ids: LinkId[] = [];
-    for (let index = 0; index < this.model.linkCount; index++) {
-      if (this.model.linkFlags[index] & LINK_SELECTED) {
-        ids.push(this.model.linkIdAt(index) as LinkId);
-      }
-    }
-    return ids;
+    return this.selection.selectedLinks();
   }
 
   /** Dims every node and link that is not adjacent to the focus node. */
   focus(id: NodeId | number): this {
-    const index = this.model.nodeIndexOf(id);
-    if (index < 0) {
-      return this;
-    }
-    const model = this.model;
-    const neighbors = new Set<number>([index]);
-    for (let link = 0; link < model.linkCount; link++) {
-      const touches = model.source[link] === index || model.target[link] === index;
-      if (touches) {
-        neighbors.add(model.source[link]);
-        neighbors.add(model.target[link]);
-      } else {
-        model.linkFlags[link] |= LINK_DIM;
-      }
-    }
-    for (let node = 0; node < model.nodeCount; node++) {
-      if (!neighbors.has(node)) {
-        model.flags[node] |= NODE_DIM;
-      } else {
-        model.flags[node] &= ~NODE_DIM;
-      }
-    }
-    model.appearanceRevision++;
-    this.invalidate();
+    this.focusController.focus(id);
     return this;
   }
 
   /** Removes all dimming applied by focus. */
   unfocus(): this {
-    const model = this.model;
-    for (let node = 0; node < model.nodeCount; node++) {
-      model.flags[node] &= ~NODE_DIM;
-    }
-    for (let link = 0; link < model.linkCount; link++) {
-      model.linkFlags[link] &= ~LINK_DIM;
-    }
-    model.appearanceRevision++;
-    this.invalidate();
+    this.focusController.unfocus();
     return this;
   }
 
