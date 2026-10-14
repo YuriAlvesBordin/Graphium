@@ -1,37 +1,42 @@
 {
   "name": "graphium",
-  "version": "1.0.0",
-  "description": "High-performance WebGL2 2D graph visualization library with force-directed layout and interactive controls",
+  "version": "2.0.0",
+  "description": "Remastered high-performance WebGL2 graph visualization library with silk-smooth force physics, curved edges, node images and a fluent API",
   "type": "module",
-  "main": "src/Graphium.js",
-  "module": "src/Graphium.js",
-  "types": "src/Graphium.d.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "files": [
-    "src"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
-    "test": "echo \"No tests specified\" && exit 0"
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "demo": "npx --yes serve ."
   },
   "keywords": [
     "graph",
     "visualization",
-    "webgl",
     "webgl2",
     "force-directed",
     "network",
-    "d3-alternative"
+    "physics",
+    "typescript"
   ],
   "author": "Yuri",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yourusername/Graphium.git"
-  },
-  "bugs": {
-    "url": "https://github.com/yourusername/Graphium/issues"
-  },
-  "homepage": "https://github.com/yourusername/Graphium#readme",
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
   }
 }
