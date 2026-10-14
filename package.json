@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "watch": "tsc -p tsconfig.json --watch",
-    "demo": "npx --yes serve ."
+    "demo": "npx --yes serve .",
+    "check:api": "node scripts/check-api.mjs"
   },
   "keywords": [
     "graph",
