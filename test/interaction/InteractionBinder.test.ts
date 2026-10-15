@@ -4,20 +4,25 @@ import { GraphModel, STATE_HOVER, STATE_NORMAL } from '../../src/core/GraphModel
 import { DEFAULT_THEME } from '../../src/core/theme';
 import { PhysicsEngine } from '../../src/physics/PhysicsEngine';
 import { SelectionController } from '../../src/core/SelectionController';
+import { PointerController } from '../../src/interaction/PointerController';
 
 // The pointer controller needs a browser canvas; stub it out so the binder
-// wiring can be exercised in a plain Node environment.
-jest.mock('../../src/interaction/PointerController', () => {
-  return {
-    PointerController: jest.fn().mockImplementation(() => ({
-      options: {},
-      destroy: jest.fn(),
-    })),
-  };
-});
+// wiring can be exercised in a plain Node environment. Constructor arguments
+// are preserved so tests can reach the injected options object.
+jest.mock('../../src/interaction/PointerController', () => ({
+  PointerController: jest.fn().mockImplementation(() => ({
+    options: {},
+    destroy: jest.fn(),
+  })),
+}));
 
-function createBinder() {
-  const model = new GraphModel({ nodeCapacity: 10, linkCapacity: 10, theme: DEFAULT_THEME });
+function lastPointerOptions(): { pickLink?: (x: number, y: number, r: number) => number; [key: string]: unknown } {
+  const calls = (PointerController as unknown as jest.Mock).mock.calls;
+  return calls[calls.length - 1][6];
+}
+
+function createBinder(overrides: Record<string, unknown> = {}) {
+  const model = new GraphModel({ nodeCapacity: 16, linkCapacity: 16, theme: DEFAULT_THEME });
   const physics = new PhysicsEngine(model, {});
   const events = new Emitter();
   const selection = new SelectionController(model, () => {});
@@ -27,11 +32,12 @@ function createBinder() {
     model,
     physics,
     camera: { zoom: 1 } as never,
-    hash: {} as never,
+    hash: physics.hash,
     events,
     interaction: {},
     selection,
     invalidate,
+    ...overrides,
   });
   return { model, physics, events, selection, invalidate, binder };
 }
@@ -44,11 +50,47 @@ describe('InteractionBinder', () => {
   });
 
   it('should forward sleep and wake through the emitter', () => {
-    const { physics, events } = createBinder();
+    const { physics, events, invalidate } = createBinder();
     const seen: unknown[] = [];
     events.on('sleep', payload => seen.push(payload));
     physics.onSleep?.(0.25);
+    physics.onWake?.();
     expect(seen).toEqual([{ energy: 0.25 }]);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('should map explicit interaction settings onto the pointer options', () => {
+    createBinder({
+      interaction: { wheelZoomSpeed: 3, dragThreshold: 9, longPressMs: 700, linkHitRadius: 4, hoverEnabled: false, panEnabled: false, zoomEnabled: false, dragEnabled: false },
+    });
+    const options = lastPointerOptions();
+    expect(options.wheelZoomSpeed).toBe(3);
+    expect(options.dragThreshold).toBe(9);
+    expect(options.longPressMs).toBe(700);
+    expect(options.linkHitRadius).toBe(4);
+    expect(options.hoverEnabled).toBe(false);
+    expect(options.panEnabled).toBe(false);
+    expect(options.zoomEnabled).toBe(false);
+    expect(options.dragEnabled).toBe(false);
+  });
+
+  it('should pass the interaction true shorthand through verbatim', () => {
+    // The binder maps settings as-is; applying defaults is the pointer
+    // controller's own concern (it receives {} and applies 1.12/4/true).
+    createBinder({ interaction: true });
+    const options = lastPointerOptions();
+    expect(options.wheelZoomSpeed).toBeUndefined();
+    expect(options.dragThreshold).toBeUndefined();
+    expect(options.hoverEnabled).toBeUndefined();
+  });
+
+  it('should skip pointer construction when interaction is false', () => {
+    const callsBefore = (PointerController as unknown as jest.Mock).mock.calls.length;
+    const { binder } = createBinder({ interaction: false });
+    expect((PointerController as unknown as jest.Mock).mock.calls.length).toBe(callsBefore);
+    expect((binder as unknown as { pointer: unknown }).pointer).toBeNull();
+    expect(() => binder.setInteraction({ wheelZoomSpeed: 2 })).not.toThrow();
+    expect(() => binder.destroy()).not.toThrow();
   });
 
   it('should invalidate on pan, zoom and pinch events', () => {
@@ -57,6 +99,13 @@ describe('InteractionBinder', () => {
     events.emit('zoom', {});
     events.emit('pinch', {});
     expect(invalidate).toHaveBeenCalledTimes(3);
+  });
+
+  it('should invalidate on dragend and imageload events', () => {
+    const { events, invalidate } = createBinder();
+    events.emit('dragend', {});
+    events.emit('imageload', {});
+    expect(invalidate).toHaveBeenCalledTimes(2);
   });
 
   it('should wake the physics on drag', () => {
@@ -100,6 +149,16 @@ describe('InteractionBinder', () => {
     expect(invalidate).toHaveBeenCalledTimes(3);
   });
 
+  it('should ignore repeated hover payloads for the same index', () => {
+    const { model, events, invalidate } = createBinder();
+    model.addNode('a', {});
+    events.emit('hover', { nodeIndex: 0 });
+    events.emit('hover', { nodeIndex: 0 });
+    events.emit('hover', { nodeIndex: 0 });
+    expect(invalidate).toHaveBeenCalledTimes(3);
+    expect(model.state[0]).toBe(STATE_HOVER);
+  });
+
   it('should patch pointer options through setInteraction', () => {
     const { binder } = createBinder();
     binder.setInteraction({ wheelZoomSpeed: 2.5 });
@@ -109,6 +168,37 @@ describe('InteractionBinder', () => {
   it('should return -1 from pickLinkAt when the graph has no links', () => {
     const { binder } = createBinder();
     expect(binder.pickLinkAt(0, 0, 8)).toBe(-1);
+  });
+
+  it('should find the closest visible link through scanning', () => {
+    const { model, binder } = createBinder();
+    model.addNode('a', { x: -100, y: 0 });
+    model.addNode('b', { x: 100, y: 0 });
+    model.addNode('c', { x: 0, y: 20 });
+    model.addNode('d', { x: 0, y: 400 });
+    model.addLink('ab', 'a', 'b', { width: 4 });
+    model.addLink('cd', 'c', 'd', {});
+    expect(binder.pickLinkAt(0, 1, 8)).toBe(0);
+    expect(binder.pickLinkAt(0, 380, 8)).toBe(1);
+    expect(binder.pickLinkAt(30, 200, 4)).toBe(-1);
+  });
+
+  it('should skip hidden links during picking', () => {
+    const { model, binder } = createBinder();
+    model.addNode('a', { x: -100, y: 0 });
+    model.addNode('b', { x: 100, y: 0 });
+    model.addLink('ab', 'a', 'b', { hidden: true });
+    expect(binder.pickLinkAt(0, 0, 8)).toBe(-1);
+  });
+
+  it('should delegate the host pickLink callback into pickLinkAt', () => {
+    const { model } = createBinder();
+    model.addNode('a', { x: -100, y: 0 });
+    model.addNode('b', { x: 100, y: 0 });
+    model.addLink('ab', 'a', 'b', { width: 4 });
+    const options = lastPointerOptions();
+    expect(typeof options.pickLink).toBe('function');
+    expect(options.pickLink?.(0, 0, 8)).toBe(0);
   });
 
   it('should destroy the pointer controller', () => {

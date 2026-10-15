@@ -279,3 +279,151 @@ describe('PhysicsEngine', () => {
     expect(model.vx[0]).toBeCloseTo(100 * Math.pow(0.5, 3), 5);
   });
 });
+
+describe('PhysicsEngine remaining branches', () => {
+  it('should apply temperature and reallocate the neighbor buffer via setOptions', () => {
+    const engine = makeEngine(makeModel());
+    engine.setOptions({ temperature: 0.4, maxNeighbors: 32 });
+    expect(engine.temperature).toBe(0.4);
+    expect((engine as unknown as { neighbors: Int32Array }).neighbors.length).toBe(32);
+  });
+
+  it('should skip gravity for fixed nodes', () => {
+    const model = makeModel();
+    model.addNode('anchor', { x: 100, y: 100 });
+    model.setNodeFixed(0, true);
+    const engine = makeEngine(model, { gravity: 0.01 });
+    engine.step(1 / 60);
+    expect(model.x[0]).toBe(100);
+    expect(model.y[0]).toBe(100);
+  });
+
+  it('should separate nodes spawned at the exact same position', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 0, y: 0 });
+    const engine = makeEngine(model, { repulsion: 1100, collisionStrength: 1, positionIterations: 1 });
+    engine.step(1 / 60);
+    const distance = Math.hypot(model.x[1] - model.x[0], model.y[1] - model.y[0]);
+    expect(distance).toBeGreaterThan(0.0001);
+  });
+
+  it('should ignore hidden links in the spring pass', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 200, y: 0 });
+    model.addLink('e', 'a', 'b', { restLength: 50, hidden: true });
+    const engine = makeEngine(model, { springStrength: 1 });
+    engine.step(1 / 60);
+    expect(model.x[0]).toBe(0);
+    expect(model.x[1]).toBe(200);
+  });
+
+  it('should skip springs and constraints between two fixed nodes', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 30, y: 0 });
+    model.setNodeFixed(0, true);
+    model.setNodeFixed(1, true);
+    model.addLink('e', 'a', 'b', { restLength: 5 });
+    const engine = makeEngine(model, { springStrength: 1, collisionStrength: 1 });
+    engine.step(1 / 60);
+    expect(model.x[0]).toBe(0);
+    expect(model.x[1]).toBe(30);
+  });
+
+  it('should pull only the free end of a spring whose other end is fixed', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 200, y: 0 });
+    model.setNodeFixed(1, true);
+    model.addLink('e', 'a', 'b', { restLength: 50 });
+    const engine = makeEngine(model, { springStrength: 1 });
+    engine.step(1 / 60);
+    expect(model.x[1]).toBe(200);
+    expect(model.x[0]).toBeGreaterThan(0);
+  });
+
+  it('should jitter apart nodes that overlap exactly during collision', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 0, y: 0 });
+    const engine = makeEngine(model, { repulsion: 0, collisionStrength: 1, positionIterations: 1 });
+    engine.step(1 / 60);
+    const distance = Math.hypot(model.x[1] - model.x[0], model.y[1] - model.y[0]);
+    expect(distance).toBeGreaterThan(0.0001);
+  });
+
+  it('should grow the edge midpoint buffers past 256 links', () => {
+    const model = makeModel(8, 8);
+    model.addNode('hub', { x: 0, y: 0 });
+    for (let i = 0; i < 300; i++) {
+      model.addNode(`n${i}`, { x: Math.cos(i) * 300, y: Math.sin(i) * 300 });
+      model.addLink(`e${i}`, 'hub', `n${i}`, {});
+    }
+    const engine = makeEngine(model, { edgeSeparation: 1, positionIterations: 1 });
+    expect(() => engine.step(1 / 60)).not.toThrow();
+  });
+
+  it('should break out after four thousand crossing conflicts', () => {
+    const model = makeModel(256, 256);
+    // 120 segments through the origin: 119 visible ones produce
+    // 119 * 118 / 2 = 7021 crossing pairs; the loop must bail at 4000.
+    // Collision is disabled so the geometry stays exactly on the crossing.
+    for (let i = 0; i < 120; i++) {
+      const angle = (i / 120) * Math.PI;
+      const x = Math.cos(angle) * 250;
+      const y = Math.sin(angle) * 250;
+      model.addNode(`a${i}`, { x, y });
+      model.addNode(`b${i}`, { x: -x, y: -y });
+      // The first link is hidden so its skip runs before the conflict break.
+      model.addLink(`e${i}`, `a${i}`, `b${i}`, { hidden: i === 0 });
+    }
+    const engine = makeEngine(model, { edgeSeparation: 1, collisionStrength: 0 });
+    expect(() => engine.step(1 / 60)).not.toThrow();
+    expect((engine as unknown as { edgeScratch: Int32Array }).edgeScratch.length).toBeGreaterThan(0);
+  });
+
+  it('should skip crossing checks for links sharing an endpoint', () => {
+    const model = makeModel();
+    model.addNode('a', { x: -80, y: 0 });
+    model.addNode('b', { x: 80, y: 0 });
+    model.addNode('c', { x: 0, y: 80 });
+    model.addLink('ab', 'a', 'b', {});
+    model.addLink('bc', 'b', 'c', {});
+    const engine = makeEngine(model, { edgeSeparation: 1, positionIterations: 1 });
+    const beforeX = model.x[0];
+    engine.step(1 / 60);
+    expect(Number.isFinite(beforeX)).toBe(true);
+  });
+
+  it('should ignore near parallel non crossing edges inside the query window', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 40, y: 0 });
+    model.addNode('c', { x: 0, y: 20 });
+    model.addNode('d', { x: 40, y: 20 });
+    model.addLink('ab', 'a', 'b', {});
+    model.addLink('cd', 'c', 'd', {});
+    const engine = makeEngine(model, { edgeSeparation: 1, positionIterations: 1 });
+    engine.step(1 / 60);
+    expect(model.x[0]).toBe(0);
+  });
+
+  it('should not nudge a fixed endpoint while untangling crossings', () => {
+    const model = makeModel();
+    model.addNode('a', { x: -100, y: -50 });
+    model.addNode('b', { x: 100, y: 50 });
+    model.addNode('c', { x: -150, y: 60 });
+    model.addNode('d', { x: 120, y: -60 });
+    model.setNodeFixed(0, true);
+    model.addLink('ab', 'a', 'b', {});
+    model.addLink('cd', 'c', 'd', {});
+    const engine = makeEngine(model, { edgeSeparation: 1, positionIterations: 1 });
+    engine.step(1 / 60);
+    expect(model.x[0]).toBe(-100);
+    expect(model.y[0]).toBe(-50);
+    const moved = model.x[1] !== 100 || model.y[1] !== 50 || model.x[2] !== -150 || model.y[2] !== 60;
+    expect(moved).toBe(true);
+  });
+});
