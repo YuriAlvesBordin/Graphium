@@ -32,9 +32,7 @@ import type {
 } from './core/types.js';
 import { InteractionBinder } from './interaction/InteractionBinder.js';
 import { PhysicsEngine } from './physics/PhysicsEngine.js';
-import { PRESETS } from './physics/presets.js';
 import { Camera } from './render/Camera.js';
-import { controlPoint } from './render/geometry.js';
 import { LabelLayer } from './render/LabelLayer.js';
 import { RenderLoop } from './render/RenderLoop.js';
 import { Renderer } from './render/Renderer.js';
@@ -504,5 +502,3 @@ function createCanvasIn(host: HTMLElement): HTMLCanvasElement {
   host.appendChild(canvas);
   return canvas;
 }
-
-export { PRESETS, BUILT_IN_THEMES, controlPoint };

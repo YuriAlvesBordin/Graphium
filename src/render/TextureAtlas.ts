@@ -172,9 +172,6 @@ export class TextureAtlas {
         }
         return false;
       };
-      if (check()) {
-        return;
-      }
       const previous = this.onEvent;
       this.onEvent = event => {
         if (previous) {
