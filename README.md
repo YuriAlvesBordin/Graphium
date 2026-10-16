@@ -7,6 +7,8 @@
 
 High-performance WebGL2 graph visualization with silk-smooth force physics, curved edges, node images, and a fluent API.
 
+![Graphium hero](docs/assets/hero.png)
+
 ## Installation
 
 ```bash
@@ -38,25 +40,62 @@ graph.fit(80);
 
 ## Showcase
 
-Graphium hero - main visualization with curved edges and dark theme:
+### Force-directed physics
 
-![Graphium hero](docs/assets/hero.png)
+A 120 node clustered graph reorganizing itself after a disturbance. The solver
+combines repulsion, link springs, gravity, damping, and collision handling while
+spatial hashing keeps neighbor lookups near O(n). The graph sleeps automatically
+when it settles, dropping CPU usage to near zero.
 
-Curved edges rendered on the GPU:
+![Force physics](docs/assets/physics.gif)
 
-![Curved edges](docs/assets/curved-edges.png)
+### Curved edges
 
-Light theme - clean appearance for bright environments:
+Edge curvature adjusted at runtime from straight to strongly curved in both
+directions. Curves are computed on the GPU, so styling thousands of edges costs
+no extra CPU. Positive values curve one way, negative values the other.
 
-![Light theme](docs/assets/light-theme.png)
+![Curved edges](docs/assets/curved-edges.gif)
 
-Tree layout with arrows:
+### Built-in themes
 
-![Tree layout](docs/assets/tree.png)
+The four bundled themes (midnight, light, slate, sunset) switching at runtime.
+Each theme controls background, node palette, edge styling, labels, and the
+hover and selection rings. Custom themes merge over the current one, so you can
+override only what you need.
 
-Live showcase with physics simulation and interaction:
+![Themes](docs/assets/themes.gif)
 
-![Showcase](github-connections/assets/Showcase.gif)
+### Node images
+
+Toggling node images on and off. Any node can take an image (URL or canvas
+data URL) rendered inside the circle with cover fit. Images upload to the GPU
+through a texture atlas, keeping draw calls minimal.
+
+![Node images](docs/assets/node-images.gif)
+
+### Arrow heads
+
+Turning directed arrow heads on. Arrows follow the edge path, respect
+curvature, and scale with zoom.
+
+![Arrows](docs/assets/arrows.gif)
+
+### Tree layout
+
+A binary tree dataset settling under the same force solver. When hierarchical
+data needs cleaner separation, edge separation tuning untangles crossings, and
+any dataset type can be swapped at runtime.
+
+![Tree layout](docs/assets/tree-layout.gif)
+
+### Click to focus and inspect
+
+Clicking a node focuses the camera on it and opens the inspector with live
+degree, position, and velocity. Dragging works with momentum, the wheel zooms,
+and every interaction emits events you can subscribe to.
+
+![Interaction](docs/assets/interaction.gif)
 
 ## Documentation
 
