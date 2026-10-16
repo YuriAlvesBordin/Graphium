@@ -38,13 +38,23 @@ graph.fit(80);
 
 ## Showcase
 
+Graphium hero - main visualization with curved edges and dark theme:
+
 ![Graphium hero](docs/assets/hero.png)
+
+Curved edges rendered on the GPU:
 
 ![Curved edges](docs/assets/curved-edges.png)
 
+Light theme - clean appearance for bright environments:
+
 ![Light theme](docs/assets/light-theme.png)
 
+Tree layout with arrows:
+
 ![Tree layout](docs/assets/tree.png)
+
+Live showcase with physics simulation and interaction:
 
 ![Showcase](github-connections/assets/Showcase.gif)
 
