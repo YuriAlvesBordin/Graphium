@@ -1,5 +1,5 @@
 {
-  "name": "graphium",
+  "name": "@yurialvesbordin/graphium",
   "version": "2.0.0",
   "description": "Remastered high-performance WebGL2 graph visualization library with silk-smooth force physics, curved edges, node images and a fluent API",
   "type": "module",
