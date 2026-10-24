@@ -43,7 +43,6 @@ export const DEFAULT_THEME: ThemeResolved = {
   labelBackground: null,
   labelPadding: [8, 4],
   labelRadius: 6,
-  labelCullOverlapping: true,
 };
 
 /** Merges user theme values over defaults into a resolved theme object. */
@@ -166,9 +165,6 @@ export function resolveTheme(theme: ThemeOptions | undefined, previous?: ThemeRe
   }
   if (label.radius !== undefined) {
     resolved.labelRadius = label.radius;
-  }
-  if (label.cullOverlapping !== undefined) {
-    resolved.labelCullOverlapping = label.cullOverlapping;
   }
   return resolved;
 }

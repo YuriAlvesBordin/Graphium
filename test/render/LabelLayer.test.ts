@@ -7,18 +7,6 @@ import { Camera } from '../../src/render/Camera';
 import { GraphModel, NODE_DIM, NODE_HIDDEN } from '../../src/core/GraphModel';
 import { DEFAULT_THEME, resolveTheme } from '../../src/core/theme';
 
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
-
-beforeAll(() => {
-  // jsdom has no canvas support: answer 2D context requests quietly with null
-  // so label measurement runs on the estimate fallback without console noise.
-  HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
-});
-
-afterAll(() => {
-  HTMLCanvasElement.prototype.getContext = originalGetContext;
-});
-
 function makeLayer(themeOverrides: Record<string, unknown> = {}) {
   const theme = resolveTheme({ ...themeOverrides });
   const parent = document.createElement('div');
@@ -129,7 +117,7 @@ describe('LabelLayer', () => {
   });
 
   it('should cap the pool at four hundred visible labels', () => {
-    const { layer, model } = makeLayer({ label: { cullOverlapping: false } });
+    const { layer, model } = makeLayer();
     for (let i = 0; i < 450; i++) {
       model.addNode(`n${i}`, { x: i % 20, y: Math.floor(i / 20), label: `N${i}` });
     }
@@ -210,125 +198,5 @@ describe('LabelLayer background branches', () => {
     const element = layer.container.firstElementChild as HTMLElement;
     expect(element.style.background).toBe('none');
     expect(element.style.padding).toBe('0px');
-  });
-});
-
-describe('LabelLayer overlap culling', () => {
-  afterEach(() => {
-    document.body.innerHTML = '';
-  });
-
-  function makeCullLayer(themeOverrides: Record<string, unknown> = {}) {
-    return makeLayer(themeOverrides);
-  }
-
-  it('should hide the label that would overlap a higher priority label', () => {
-    const { layer, model } = makeCullLayer();
-    model.addNode('big', { x: 0, y: 0, radius: 20, label: 'Big node' });
-    model.addNode('small', { x: 4, y: 0, radius: 6, label: 'Small' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(1);
-    expect(layer.container.firstElementChild?.textContent).toBe('Big node');
-  });
-
-  it('should show both labels when they do not overlap', () => {
-    const { layer, model } = makeCullLayer();
-    model.addNode('left', { x: 0, y: 0, label: 'Left' });
-    model.addNode('right', { x: 400, y: 200, label: 'Right' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(2);
-  });
-
-  it('should keep the selected node label over a larger plain node', () => {
-    const { layer, model } = makeCullLayer({ label: { position: 'center' } });
-    model.addNode('big', { x: 0, y: 0, radius: 30, label: 'Big' });
-    model.addNode('picked', { x: 6, y: 0, radius: 5, label: 'Picked', state: 'selected' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(1);
-    expect(layer.container.firstElementChild?.textContent).toBe('Picked');
-  });
-
-  it('should keep the dragged node label over a larger plain node', () => {
-    const { layer, model } = makeCullLayer({ label: { position: 'center' } });
-    model.addNode('big', { x: 0, y: 0, radius: 30, label: 'Big' });
-    model.addNode('moved', { x: 6, y: 0, radius: 5, label: 'Moved', state: 'dragging' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(1);
-    expect(layer.container.firstElementChild?.textContent).toBe('Moved');
-  });
-
-  it('should break ties by insertion order for same sized nodes', () => {
-    const { layer, model } = makeCullLayer();
-    model.addNode('first', { x: 0, y: 0, label: 'First' });
-    model.addNode('second', { x: 2, y: 0, label: 'Second' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(1);
-    expect(layer.container.firstElementChild?.textContent).toBe('First');
-  });
-
-  it('should show every label when culling is disabled', () => {
-    const { layer, model } = makeCullLayer({ label: { cullOverlapping: false } });
-    model.addNode('a', { x: 0, y: 0, label: 'Alpha' });
-    model.addNode('b', { x: 4, y: 0, label: 'Beta' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(2);
-  });
-
-  it('should account for the themed background padding when culling', () => {
-    const { layer, model } = makeCullLayer({
-      label: { background: 'rgba(0,0,0,0.6)', padding: [40, 10] },
-    });
-    model.addNode('a', { x: 0, y: 0, label: 'Alpha' });
-    model.addNode('b', { x: 30, y: 0, label: 'Beta' });
-    layer.update();
-    // 40px horizontal padding per side makes both boxed labels collide.
-    expect(layer.container.childElementCount).toBe(1);
-  });
-
-  it('should reuse measured widths from the 2D context cache', () => {
-    const measureText = jest.fn(() => ({ width: 64 }));
-    const contextSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockReturnValue({ measureText, font: '' } as unknown as CanvasRenderingContext2D);
-    const { layer, model } = makeCullLayer();
-    model.addNode('a', { x: 0, y: 0, label: 'Measured' });
-    model.addNode('b', { x: 40, y: 0, label: 'Measured' });
-    layer.update();
-    expect(measureText).toHaveBeenCalledTimes(1); // second label hits the cache
-    expect(layer.container.childElementCount).toBe(1);
-    contextSpy.mockRestore();
-  });
-
-  it('should survive a throwing measurement context with the estimate fallback', () => {
-    const contextSpy = jest
-      .spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockImplementation(() => {
-        throw new Error('no canvas');
-      });
-    const { layer, model } = makeCullLayer();
-    model.addNode('a', { x: 0, y: 0, label: 'Estimated' });
-    model.addNode('b', { x: 3, y: 0, label: 'Near' });
-    layer.update();
-    expect(layer.container.childElementCount).toBe(1);
-    contextSpy.mockRestore();
-  });
-
-  it('should keep culling labels from more candidates than the initial buffer', () => {
-    const { layer, model } = makeCullLayer();
-    for (let i = 0; i < 200; i++) {
-      model.addNode(`n${i}`, { x: i % 10, y: Math.floor(i / 10), label: `N${i}` });
-    }
-    layer.update();
-    expect(layer.container.childElementCount).toBeLessThan(200);
-    expect(layer.container.childElementCount).toBeGreaterThan(0);
-  });
-
-  it('should reset the measurement cache once it exceeds its bound', () => {
-    const { layer, model } = makeCullLayer();
-    for (let i = 0; i < 4200; i++) {
-      model.addNode(`n${i}`, { x: i * 0.1 - 210, y: 0, label: `label-${i}` });
-    }
-    expect(() => layer.update()).not.toThrow();
-    expect(layer.container.childElementCount).toBeGreaterThan(0);
   });
 });
