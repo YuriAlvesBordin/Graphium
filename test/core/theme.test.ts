@@ -96,6 +96,7 @@ describe('Theme Resolution', () => {
         background: 'rgba(0,0,0,0.5)',
         padding: [10, 6],
         radius: 9,
+        cullOverlapping: false,
       },
     });
     expect(result.labelEnabled).toBe(false);
@@ -108,6 +109,12 @@ describe('Theme Resolution', () => {
     expect(result.labelBackground).toBe('rgba(0,0,0,0.5)');
     expect(result.labelPadding).toEqual([10, 6]);
     expect(result.labelRadius).toBe(9);
+    expect(result.labelCullOverlapping).toBe(false);
+  });
+
+  it('should default to culling overlapping labels', () => {
+    const result = resolveTheme({});
+    expect(result.labelCullOverlapping).toBe(true);
   });
 
   it('should ignore empty groups without changing defaults', () => {

@@ -79,6 +79,7 @@ interface ThemeOptions {
     background: string | null;  // Background color (CSS rgba format) or none
     padding: [number, number];  // Horizontal and vertical padding (px)
     radius: number;             // Background corner radius (px)
+    cullOverlapping: boolean;   // Hide labels overlapping a higher priority label (default true)
   };
   
   hoverRing: {                  // Appearance when hovering over nodes
@@ -104,6 +105,18 @@ interface ThemeOptions {
   };
 }
 ```
+
+## Label Overlap Culling
+
+In dense graphs, labels can pile on top of each other and become unreadable. By default Graphium culls labels: a label is only shown when its text rectangle does not overlap a label that was already placed this frame. Placement follows a priority order — selected nodes first, then dragged nodes, then nodes with a larger radius — so the labels that matter most survive while overlapping noise is hidden.
+
+Culled labels come back automatically as the camera zooms out, the physics spreads the nodes, or the higher priority labels move away. To restore the always-show behavior, opt out per theme:
+
+```ts
+graph.setTheme({ label: { cullOverlapping: false } });
+```
+
+Label rectangles account for the themed `background` padding when a background is set, and text widths are measured once per `font + text` pair through a shared 2D canvas context and cached.
 
 ## Creating Custom Themes
 

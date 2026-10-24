@@ -117,6 +117,8 @@ export interface ThemeOptions {
     background?: string | null;
     padding?: [number, number];
     radius?: number;
+    /** Hides labels that would overlap a higher priority label (default true). */
+    cullOverlapping?: boolean;
   };
 }
 
@@ -280,4 +282,5 @@ export interface ThemeResolved {
   labelBackground: string | null;
   labelPadding: [number, number];
   labelRadius: number;
+  labelCullOverlapping: boolean;
 }
