@@ -23,6 +23,8 @@ export interface InteractionDeps {
   hash: SpatialHash;
   events: Emitter;
   interaction: GraphiumOptions['interaction'];
+  /** When true, dragged nodes are kept inside the visible world rect. */
+  constrainDrag?: boolean;
   selection: SelectionController;
   invalidate: () => void;
 }
@@ -86,6 +88,7 @@ export class InteractionBinder {
       panEnabled: settings.panEnabled,
       zoomEnabled: settings.zoomEnabled,
       dragEnabled: settings.dragEnabled,
+      constrainDrag: this.deps.constrainDrag ?? false,
       pickLink: (worldX, worldY, radius) => this.pickLinkAt(worldX, worldY, radius),
     });
   }

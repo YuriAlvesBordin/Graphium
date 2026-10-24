@@ -21,6 +21,8 @@ export interface PointerOptions {
   panEnabled?: boolean;
   zoomEnabled?: boolean;
   dragEnabled?: boolean;
+  /** Keeps the dragged node inside the visible world rect (constrainToViewport). */
+  constrainDrag?: boolean;
   pickLink?: (worldX: number, worldY: number, radius: number) => number;
 }
 
@@ -78,6 +80,7 @@ export class PointerController {
       panEnabled: options.panEnabled ?? true,
       zoomEnabled: options.zoomEnabled ?? true,
       dragEnabled: options.dragEnabled ?? true,
+      constrainDrag: options.constrainDrag ?? false,
       pickLink: options.pickLink,
     };
     this.enable();
@@ -223,6 +226,9 @@ export class PointerController {
       return;
     }
     if (this.dragNode >= 0) {
+      if (this.options.constrainDrag) {
+        this.constrainDragTarget();
+      }
       this.physics.dragTo(this.world.x, this.world.y);
       this.emit('drag', event, this.dragNode, -1, position.screenX, position.screenY);
     } else if (this.isPanning) {
@@ -239,6 +245,21 @@ export class PointerController {
   private pinchDistance = 0;
   private pinchCenterX = 0;
   private pinchCenterY = 0;
+
+  /** Clamps the drag target so the dragged node never leaves the visible world rect. */
+  private constrainDragTarget(): void {
+    const radius = this.model.visualRadius[this.dragNode];
+    const halfWidth = (this.camera.width / this.camera.zoom) * 0.5;
+    const halfHeight = (this.camera.height / this.camera.zoom) * 0.5;
+    const left = this.camera.x - halfWidth + radius;
+    const right = this.camera.x + halfWidth - radius;
+    const top = this.camera.y - halfHeight + radius;
+    const bottom = this.camera.y + halfHeight - radius;
+    // A node wider than half the viewport (very deep zoom) cannot fit, so the
+    // target falls back to the camera center to keep it on screen.
+    this.world.x = left <= right ? Math.max(left, Math.min(right, this.world.x)) : this.camera.x;
+    this.world.y = top <= bottom ? Math.max(top, Math.min(bottom, this.world.y)) : this.camera.y;
+  }
 
   /** Clears drag flags and lets the physics engine keep the momentum. */
   private releaseDrag(): void {

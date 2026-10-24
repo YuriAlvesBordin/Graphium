@@ -84,6 +84,14 @@ describe('InteractionBinder', () => {
     expect(options.hoverEnabled).toBeUndefined();
   });
 
+  it('should forward constrainDrag from the facade options', () => {
+    createBinder({ constrainDrag: true });
+    expect(lastPointerOptions().constrainDrag).toBe(true);
+
+    createBinder();
+    expect(lastPointerOptions().constrainDrag).toBe(false);
+  });
+
   it('should skip pointer construction when interaction is false', () => {
     const callsBefore = (PointerController as unknown as jest.Mock).mock.calls.length;
     const { binder } = createBinder({ interaction: false });

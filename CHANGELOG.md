@@ -2,6 +2,12 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.1.5] - 2026-10-24
+
+### Fixed
+- `constrainToViewport` now keeps the graph visible even when it fits the viewport: panning no longer pushes the whole graph off screen. The camera stays free within a margin, but the content center is confined to the middle half of the viewport, so at least half of the graph always remains visible. The clamp still never recenters on its own, preserving the no-feedback-loop behavior with moving bounds
+- When `constrainToViewport` is enabled, node dragging is constrained as well: the drag target is clamped to the visible world rectangle (inset by the node's visual radius), so a node can no longer be dragged out of the visible canvas. A node whose radius exceeds half the viewport (deep zoom) is held at the camera center
+
 ## [2.1.4] - 2026-10-24
 
 ### Fixed

@@ -7,19 +7,29 @@ describe('Camera bounds', () => {
     // Nenhuma influência de estado entre testes.
   });
 
-  it('should keep the camera inside the viewport when content is smaller than the view', () => {
+  it('should keep small content visible when panning beyond the view', () => {
     const camera = new Camera({ zoom: 1 });
     camera.setViewport(viewport.width, viewport.height);
     camera.setBounds(100, 100, 300, 300);
 
-    // Conteúdo cabe na tela: o clamp é no-op — a câmera já mostra tudo.
+    // Conteúdo cabe na tela e a câmera já o mostra: posição preservada.
     expect(camera.x).toBe(0);
     expect(camera.y).toBe(0);
 
-    // Panning fica livre, pois não há área vazia a esconder.
+    // Pan permanece livre dentro de uma folga, mas não pode empurrar o
+    // conteúdo para fora da viewport: o centro do conteúdo fica confinado
+    // à metade central da tela (center 200 ± halfW 400 / halfH 200).
     camera.pan(1000, 1000);
-    expect(camera.x).toBe(1000);
-    expect(camera.y).toBe(1000);
+    expect(camera.x).toBe(600);
+    expect(camera.y).toBe(400);
+
+    // O conteúdo continua intersectando a área visível.
+    const viewLeft = camera.x - viewport.width / 2;
+    const viewTop = camera.y - viewport.height / 2;
+    expect(viewLeft).toBeLessThanOrEqual(300);
+    expect(viewTop).toBeLessThanOrEqual(300);
+    expect(camera.x + viewport.width / 2).toBeGreaterThanOrEqual(100);
+    expect(camera.y + viewport.height / 2).toBeGreaterThanOrEqual(100);
   });
 
   it('should clamp panning to the content edges when content is larger than the view', () => {

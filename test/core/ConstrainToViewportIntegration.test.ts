@@ -114,7 +114,7 @@ describe('constrainToViewport integration', () => {
     graph.destroy();
   });
 
-  it('should keep camera centered on small content that fits the viewport', () => {
+  it('should keep small content visible when the camera pans far away', () => {
     const graph = Graphium.create({
       container: createHost(),
       autoStart: false,
@@ -123,15 +123,19 @@ describe('constrainToViewport integration', () => {
 
     graph.addNode('a', { x: 100, y: 100, radius: 20 });
 
-    // Conteúdo pequeno cabe na tela: o clamp é no-op, a câmera não é forçada
-    // a recentralizar (centralizar é papel de fit()/centerOn()).
+    // Conteúdo pequeno cabe na tela: o clamp não recentraliza por conta
+    // própria, mas se a câmera inicial já deixaria o nó fora da tela ela é
+    // puxada para dentro (centro do conteúdo confinado à metade central).
+    const halfWidth = graph.camera.width / graph.camera.zoom * 0.5;
+    const halfHeight = graph.camera.height / graph.camera.zoom * 0.5;
     expect(graph.camera.x).toBeCloseTo(0);
-    expect(graph.camera.y).toBeCloseTo(0);
+    expect(graph.camera.y).toBeCloseTo(Math.max(0, 100 - halfHeight));
 
-    // Pan fica livre, pois a viewport já cobre todo o conteúdo.
+    // Pan fica livre dentro de uma folga, mas o centro do conteúdo nunca
+    // sai da metade central da viewport — o grafo não pode ser perdido.
     graph.camera.pan(5000, 5000);
-    expect(graph.camera.x).toBeCloseTo(5000);
-    expect(graph.camera.y).toBeCloseTo(5000);
+    expect(graph.camera.x).toBeCloseTo(100 + halfWidth);
+    expect(graph.camera.y).toBeCloseTo(100 + halfHeight);
 
     graph.destroy();
   });

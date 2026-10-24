@@ -62,7 +62,7 @@ function pointerEvent(overrides: Record<string, unknown> = {}): PointerEvent {
   } as unknown as PointerEvent;
 }
 
-function createHarness() {
+function createHarness(options: Record<string, unknown> = {}) {
   const canvas = createStubCanvas();
   const camera = new Camera();
   camera.setViewport(800, 400);
@@ -73,6 +73,7 @@ function createHarness() {
   const events = new Emitter();
   const controller = new PointerController(canvas.element, camera, model, physics, physics.hash, events, {
     pickLink: jest.fn(() => -1),
+    ...options,
   });
   return { canvas, camera, model, physics, events, controller };
 }
@@ -397,6 +398,59 @@ describe('PointerController', () => {
 function physicsHashRebuild(harness: { model: GraphModel; physics: PhysicsEngine }): void {
   harness.physics.hash.rebuild(harness.model.x, harness.model.y, harness.model.nodeCount);
 }
+
+describe('PointerController drag constraining', () => {
+  it('should clamp the drag target so the node stays inside the viewport', () => {
+    const harness = createHarness({ constrainDrag: true });
+    const { canvas, model, physics, events } = harness;
+    model.addNode('grab', { x: 0, y: 0, radius: 20 });
+    physicsHashRebuild(harness);
+    const dragTo = jest.spyOn(physics, 'dragTo');
+    const drags: Array<Record<string, unknown>> = [];
+    events.on('drag', payload => drags.push(payload as Record<string, unknown>));
+
+    canvas.fire('pointerdown', pointerEvent({ clientX: 500, clientY: 250 }));
+    // World (1000, 200) is far beyond the visible rect: the node center is
+    // kept at half viewport minus the node radius (400 - 20 / 200 - 20).
+    canvas.fire('pointermove', pointerEvent({ clientX: 1500, clientY: 450 }));
+    expect(dragTo).toHaveBeenLastCalledWith(380, 180);
+    expect(drags[0].worldX).toBeCloseTo(380);
+    expect(drags[0].worldY).toBeCloseTo(180);
+
+    // Moving back inside the viewport releases the clamp immediately.
+    canvas.fire('pointermove', pointerEvent({ clientX: 500, clientY: 250 }));
+    expect(dragTo).toHaveBeenLastCalledWith(0, 0);
+  });
+
+  it('should not constrain drags when constrainDrag is disabled', () => {
+    const harness = createHarness();
+    const { canvas, model, physics, events } = harness;
+    model.addNode('grab', { x: 0, y: 0, radius: 20 });
+    physicsHashRebuild(harness);
+    const dragTo = jest.spyOn(physics, 'dragTo');
+
+    canvas.fire('pointerdown', pointerEvent({ clientX: 500, clientY: 250 }));
+    canvas.fire('pointermove', pointerEvent({ clientX: 1500, clientY: 450 }));
+    expect(dragTo).toHaveBeenLastCalledWith(1000, 200);
+  });
+
+  it('should keep an oversized node at the camera center when it cannot fit', () => {
+    const harness = createHarness({ constrainDrag: true });
+    const { canvas, camera, model, physics, events } = harness;
+    model.addNode('big', { x: 0, y: 0, radius: 40 });
+    physicsHashRebuild(harness);
+    const drags: Array<Record<string, unknown>> = [];
+    events.on('drag', payload => drags.push(payload as Record<string, unknown>));
+    // Deep zoom: half the viewport in world units (800/40/2 = 10) is smaller
+    // than the node radius, so the clamp range inverts.
+    camera.setZoom(40);
+
+    canvas.fire('pointerdown', pointerEvent({ clientX: 500, clientY: 250 }));
+    canvas.fire('pointermove', pointerEvent({ clientX: 900, clientY: 450 }));
+    expect(drags[0].worldX).toBeCloseTo(0);
+    expect(drags[0].worldY).toBeCloseTo(0);
+  });
+});
 
 describe('PointerController remaining branches', () => {
   it('should grow the pick buffer when the graph exceeds its capacity', () => {

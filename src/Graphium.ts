@@ -123,6 +123,7 @@ export class Graphium {
       hash: this.physics.hash,
       events: this.events,
       interaction: options.interaction,
+      constrainDrag: options.constrainToViewport ?? false,
       selection: this.selection,
       invalidate: () => this.invalidate(),
     });
