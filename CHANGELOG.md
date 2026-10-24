@@ -2,6 +2,16 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.2.0] - 2026-10-24
+
+### Added
+- Per-node label customization: `labelSize`, `labelScale`, `labelColor`, `labelWeight`, `labelFont` and `labelBackground` node options override the theme label styling for a single node. Unset fields fall back to the theme, so `labelScale` alone is enough to grow the text of a hub node (e.g. proportional to its connection count)
+- Fluent `NodeHandle` shortcuts: `labelScale()`, `labelSize()`, `labelColor()`, `labelWeight()`, `labelFont()` and `labelBackground()`; `labelBackground(null)` forces no background even when the theme defines one
+- Label styles reapply automatically on theme changes and only restyle a pool slot when its effective style actually changes
+
+### Documentation
+- New "Per-Node Label Customization" section in the theming guide with the option/shortcut table
+
 ## [2.1.7] - 2026-10-24
 
 ### Removed
