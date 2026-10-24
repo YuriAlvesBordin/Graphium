@@ -2,6 +2,15 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.1.6] - 2026-10-24
+
+### Added
+- Overlapping label culling: in dense regions a label is only shown when it does not overlap an already placed label. Placement follows a priority order — selected nodes first, then dragged nodes, then larger nodes — so the labels that matter most survive. Opt out with `label: { cullOverlapping: false }` (default `true`)
+- Label rects account for the themed background padding and are measured with a cached 2D canvas measurement (falling back to a per-glyph estimate where no 2D context exists)
+
+### Documentation
+- Documented the new `label.cullOverlapping` option in the theming guide
+
 ## [2.1.5] - 2026-10-24
 
 ### Fixed
