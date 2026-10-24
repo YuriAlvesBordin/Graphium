@@ -2,6 +2,11 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.1.7] - 2026-10-24
+
+### Removed
+- Label overlap culling introduced in 2.1.6, including the `label.cullOverlapping` theme option: hiding labels in dense regions left too many nodes unnamed in practice. Every visible node renders its label again, matching the behavior of 2.1.5 and earlier
+
 ## [2.1.6] - 2026-10-24
 
 ### Added
