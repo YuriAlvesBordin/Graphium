@@ -3,6 +3,13 @@
  * coordinate conversion helpers for pointer math and label placement.
  */
 
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
 export class Camera {
   width = 1;
   height = 1;
@@ -14,6 +21,8 @@ export class Camera {
   revision = 0;
   readonly matrix = new Float32Array(9);
 
+  private bounds: Bounds | null = null;
+
   constructor(options: { width?: number; height?: number; x?: number; y?: number; zoom?: number; minZoom?: number; maxZoom?: number } = {}) {
     this.x = Number.isFinite(options.x) ? (options.x as number) : 0;
     this.y = Number.isFinite(options.y) ? (options.y as number) : 0;
@@ -21,6 +30,55 @@ export class Camera {
     this.minZoom = options.minZoom ?? 0.02;
     this.maxZoom = options.maxZoom ?? 80;
     this.updateMatrix();
+  }
+
+  /** Defines a bounding area (in world coordinates) that restricts the camera. */
+  setBounds(minX: number, minY: number, maxX: number, maxY: number): this {
+    this.bounds = { minX, minY, maxX, maxY };
+    this.clampPosition();
+    this.updateMatrix();
+    return this;
+  }
+
+  /** Removes the bounding area, restoring free panning. */
+  clearBounds(): this {
+    this.bounds = null;
+    return this;
+  }
+
+  /** Returns the current bounding area, or null when none is set. */
+  getBounds(): Bounds | null {
+    return this.bounds;
+  }
+
+  /** Clamps the camera position so the bounded content stays inside the viewport. */
+  private clampPosition(): void {
+    const bounds = this.bounds;
+    if (!bounds) {
+      return;
+    }
+    const { minX, minY, maxX, maxY } = bounds;
+    const viewWidth = this.width / this.zoom;
+    const viewHeight = this.height / this.zoom;
+
+    const contentWidth = maxX - minX;
+    if (contentWidth <= viewWidth) {
+      // O conteúdo cabe na tela: centraliza e trava, não sai da viewport.
+      this.x = (minX + maxX) * 0.5;
+    } else {
+      // O conteúdo é maior que a tela: limita o pan para não mostrar
+      // área vazia além dos extremos do conteúdo.
+      const half = viewWidth * 0.5;
+      this.x = Math.max(minX + half, Math.min(maxX - half, this.x));
+    }
+
+    const contentHeight = maxY - minY;
+    if (contentHeight <= viewHeight) {
+      this.y = (minY + maxY) * 0.5;
+    } else {
+      const half = viewHeight * 0.5;
+      this.y = Math.max(minY + half, Math.min(maxY - half, this.y));
+    }
   }
 
   /** Recomputes the cached view matrix after any transform change. */
@@ -43,6 +101,7 @@ export class Camera {
   setViewport(width: number, height: number): this {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
+    this.clampPosition();
     this.updateMatrix();
     return this;
   }
@@ -51,6 +110,7 @@ export class Camera {
   setPosition(x: number, y: number): this {
     this.x = x;
     this.y = y;
+    this.clampPosition();
     this.updateMatrix();
     return this;
   }
@@ -58,6 +118,7 @@ export class Camera {
   /** Sets the zoom level clamped between the configured limits. */
   setZoom(zoom: number): this {
     this.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, zoom));
+    this.clampPosition();
     this.updateMatrix();
     return this;
   }
@@ -66,6 +127,7 @@ export class Camera {
   pan(dx: number, dy: number): this {
     this.x += dx / this.zoom;
     this.y += dy / this.zoom;
+    this.clampPosition();
     this.updateMatrix();
     return this;
   }
@@ -104,6 +166,7 @@ export class Camera {
     this.x = (minX + maxX) * 0.5;
     this.y = (minY + maxY) * 0.5;
     this.setZoom(Math.min(availableWidth / width, availableHeight / height));
+    this.clampPosition();
     return this;
   }
 }

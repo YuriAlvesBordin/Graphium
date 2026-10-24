@@ -152,6 +152,8 @@ export interface GraphiumOptions {
   interaction?: boolean | InteractionOptions;
   renderer?: RendererOptions;
   camera?: { minZoom?: number; maxZoom?: number; x?: number; y?: number; zoom?: number };
+  /** Quando verdadeiro, confina o grafo à área visível da tela (viewport) para que ele não saia dela ao pan/zoom. */
+  constrainToViewport?: boolean;
 }
 
 export interface GraphData {

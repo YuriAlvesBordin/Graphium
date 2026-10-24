@@ -32,7 +32,7 @@ import type {
 } from './core/types.js';
 import { InteractionBinder } from './interaction/InteractionBinder.js';
 import { PhysicsEngine } from './physics/PhysicsEngine.js';
-import { Camera } from './render/Camera.js';
+import { Camera, type Bounds } from './render/Camera.js';
 import { LabelLayer } from './render/LabelLayer.js';
 import { RenderLoop } from './render/RenderLoop.js';
 import { Renderer } from './render/Renderer.js';
@@ -165,12 +165,14 @@ export class Graphium {
   /** Adds one node and returns the graph for chaining. */
   addNode(id: NodeId, options: NodeOptions = {}): this {
     this.editor.addNode(id, options);
+    this.applyConstrainToViewport();
     return this;
   }
 
   /** Adds many nodes in one call and returns the graph for chaining. */
   addNodes(nodes: Array<NodeOptions & { id: NodeId }>): this {
     this.editor.addNodes(nodes);
+    this.applyConstrainToViewport();
     return this;
   }
 
@@ -189,6 +191,7 @@ export class Graphium {
   /** Adds many links in one call and returns the graph for chaining. */
   addLinks(links: Array<LinkOptions & { source: NodeId; target: NodeId }>): this {
     this.editor.addLinks(links);
+    this.applyConstrainToViewport();
     return this;
   }
 
@@ -207,12 +210,15 @@ export class Graphium {
   /** Replaces the entire graph with the supplied data payload. */
   setData(data: GraphData): this {
     this.editor.setData(data);
+    this.applyConstrainToViewport();
     return this;
   }
 
   /** Removes one node together with its links. */
   removeNode(id: NodeId): boolean {
-    return this.editor.removeNode(id);
+    const removed = this.editor.removeNode(id);
+    this.applyConstrainToViewport();
+    return removed;
   }
 
   /** Removes one link by id. */
@@ -223,6 +229,7 @@ export class Graphium {
   /** Removes every node and link while keeping the current theme. */
   clear(): this {
     this.editor.clear();
+    this.applyConstrainToViewport();
     return this;
   }
 
@@ -371,7 +378,40 @@ export class Graphium {
   /** Resizes the renderer to the canvas client size. */
   resize(): this {
     this.viewport.resize();
+    this.applyConstrainToViewport();
     return this;
+  }
+
+  /** Calcula os bounds do mundo ocupados pelos nós (incluindo o raio visual). */
+  private computeGraphBounds(): Bounds | null {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let has = false;
+    for (let index = 0; index < this.model.nodeCount; index++) {
+      const radius = this.model.visualRadius[index];
+      minX = Math.min(minX, this.model.x[index] - radius);
+      minY = Math.min(minY, this.model.y[index] - radius);
+      maxX = Math.max(maxX, this.model.x[index] + radius);
+      maxY = Math.max(maxY, this.model.y[index] + radius);
+      has = true;
+    }
+    return has ? { minX, minY, maxX, maxY } : null;
+  }
+
+  /** Aplica o confinamento da câmera aos bounds do grafo quando a opção está ativa. */
+  private applyConstrainToViewport(): void {
+    if (!this.options.constrainToViewport) {
+      this.camera.clearBounds();
+      return;
+    }
+    const bounds = this.computeGraphBounds();
+    if (!bounds) {
+      this.camera.clearBounds();
+      return;
+    }
+    this.camera.setBounds(bounds.minX, bounds.minY, bounds.maxX, bounds.maxY);
   }
 
   /** Advances physics and renders once, returning the kinetic energy. */
