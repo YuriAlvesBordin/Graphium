@@ -46,34 +46,39 @@ A Graphium theme consists of several sections, each controlling different visual
 ```ts
 interface ThemeOptions {
   background: string;           // Canvas background color
-  
+
   node: {                       // Node appearance
     radius: number;             // Node radius in pixels
-    borderWidth: number;        // Border width in pixels
+    color: string;              // Fallback fill when no palette color applies
     colorPalette: string[];     // Palette for automatic node coloring
-    defaultColor: string;       // Fallback color when palette exhausted
-    imageOpacity: number;       // Opacity of node images (0-1)
+    borderColor: string;        // Border color
+    borderWidth: number;        // Border width in pixels
+    borderOpacity: number;      // Border opacity (0-1)
+    opacity: number;            // Overall node opacity (0-1)
   };
-  
+
   edge: {                       // Link/edge appearance
     color: string;              // Default link color
     width: number;              // Default link width in pixels
-    curvature: number;          // Default curvature (-1 to 1)
+    opacity: number;            // Default link opacity (0-1)
+    curvature: number;          // Default curvature (-1.5 to 1.5)
+    style: 'solid' | 'dashed';  // Default line style
     arrowEnabled: boolean;      // Whether to show arrow heads
     arrowSize: number;          // Size of arrow heads
-    dashEnabled: boolean;       // Whether dashed lines are enabled
-    dashArray: number[];        // Pattern for dashed lines [dash, gap, ...]
+    arrowWidth: number;         // Width of arrow heads
   };
   
   label: {                      // Text label appearance
     enabled: boolean;           // Whether to show labels
+    position: 'above' | 'below' | 'center'; // Where the label sits
+    offset: number;             // Distance from the node edge (px)
     size: number;               // Font size in pixels
     color: string;              // Text color
-    background: string;         // Background color (CSS rgba format)
-    borderRadius: number;       // Background border radius
-    padding: number;            // Horizontal padding around text
-    fontFamily: string;         // Font family
-    fontWeight: number;         // Font weight (100-900)
+    font: string;               // Font family
+    weight: number | string;    // Font weight
+    background: string | null;  // Background color (CSS rgba format) or none
+    padding: [number, number];  // Horizontal and vertical padding (px)
+    radius: number;             // Background corner radius (px)
   };
   
   hoverRing: {                  // Appearance when hovering over nodes
@@ -84,6 +89,18 @@ interface ThemeOptions {
   selectedRing: {               // Appearance when selecting nodes/links
     color: string;              // Ring color
     width: number;              // Ring width in pixels
+  };
+
+  fixedRing: {                  // Appearance of fixed (pinned) nodes
+    color: string;              // Ring color
+    width: number;              // Ring width in pixels
+  };
+
+  disabledOpacity: number;      // Opacity of disabled nodes (0-1)
+  selectedEdge: {               // Appearance of selected links
+    color: string;
+    widthMultiplier: number;
+    opacity: number;
   };
 }
 ```
@@ -115,18 +132,16 @@ graph.setTheme({
     radius: 14,
     borderWidth: 2,
     colorPalette: ['#ff9ff3', '#feca57', '#48dbfb', '#1dd1a1', '#ff6b6b'],
-    defaultColor: '#ffffff',
-    imageOpacity: 0.9
+    color: '#ffffff'
   },
-  
+
   edge: {
     color: '#636e72',
     width: 1.8,
     curvature: 0.1,
     arrowEnabled: true,
     arrowSize: 6,
-    dashEnabled: true,
-    dashArray: [4, 2]
+    style: 'dashed'
   },
   
   label: {
@@ -240,11 +255,9 @@ graph.node('user123')
 // Style a specific link
 graph.linkById('alice~bob~0')
   .curve(0.4)                      // Curved link
-  .width(3)                        // Thicker line
+  .style({ width: 3 })             // Thicker line
   .color('#ff6b6b')                // Red color
-  .dashed([8, 4])                  // Longer dashes
-  .arrowSize(8)                    // Larger arrow
-  .arrowEnabled(true);             // Ensure arrow is shown
+  .dashed([8, 4]);                 // Longer dashes
 
 // Or use the link handle
 graph.link('alice~bob')
@@ -368,7 +381,7 @@ graph.setTheme({
     radius: 16,
     borderWidth: 3,
     colorPalette: ['#ffffff', '#ffff00', '#ff00ff', '#00ffff'],
-    defaultColor: '#ffffff'
+    color: '#ffffff'
   },
   edge: {
     color: '#ffffff',
@@ -462,17 +475,11 @@ const currentTheme = graph.theme;
 // Reset to default theme
 graph.setTheme({ name: 'midnight' }); // Or whatever your default is
 
-// Theme change event
-graph.on('themechange', () => {
-  console.log('Theme changed:', graph.theme);
-});
-
-// Note: Graphium doesn't emit a explicit themechange event by default
-// You would need to wrap setTheme to detect changes:
+// There is no themechange event; wrap setTheme if you need to react to it
 const originalSetTheme = graph.setTheme.bind(graph);
-graph.setTheme = (options) => {
-  const result = originalSetTheme(options);
-  // Emit custom event or callback here
+graph.setTheme = theme => {
+  const result = originalSetTheme(theme);
+  console.log('Theme changed:', graph.theme);
   return result;
 };
 ```
@@ -487,7 +494,7 @@ graph.setTheme({
     radius: 12,
     borderWidth: 2,
     colorPalette: ['#2c3e50', '#e74c3c', '#ecf0f1', '#3498db', '#2ecc71'],
-    defaultColor: '#95a5a6'
+    color: '#95a5a6'
   },
   edge: {
     color: '#bdc3c7',
@@ -521,8 +528,7 @@ graph.setTheme({
     radius: 10,
     borderWidth: 1,
     colorPalette: ['#ff006e', '#ffb400', '#00cd6c', '#00a8ff', '#9d4edd'],
-    defaultColor: '#ffffff',
-    imageOpacity: 1
+    color: '#ffffff'
   },
   edge: {
     color: '#4cc9f0',
@@ -530,8 +536,7 @@ graph.setTheme({
     curvature: 0.15,
     arrowEnabled: true,
     arrowSize: 5,
-    dashEnabled: true,
-    dashArray: [3, 1]
+    style: 'dashed'
   },
   label: {
     enabled: false // Often disabled in games for performance
@@ -555,14 +560,13 @@ graph.setTheme({
     radius: 8,
     borderWidth: 1.5,
     colorPalette: ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557'],
-    defaultColor: '#6c757d'
+    color: '#6c757d'
   },
   edge: {
     color: '#6c757d',
     width: 1,
     arrowEnabled: false, // Often undirected in scientific networks
-    dashEnabled: true,
-    dashArray: [2, 2]
+    style: 'dashed'
   },
   label: {
     size: 10,

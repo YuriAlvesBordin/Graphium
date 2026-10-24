@@ -25,30 +25,24 @@ Graphium is designed for high-performance graph visualization, but like any comp
 
 ### Built-in Statistics
 ```ts
-// Get comprehensive performance stats
+// Get a snapshot of live performance counters
 const stats = graph.stats();
 
 /*
 Returns:
 {
-  fps: 60,                    // Frames per second
-  nodeCount: 150,             // Number of nodes
-  linkCount: 200,             // Number of links
-  physicsMs: 0.8,             // Time spent in physics calculation (ms)
-  renderMs: 1.2,              // Time spent in rendering (ms)
-  overheadMs: 0.3,            // Other overhead (ms)
-  totalMs: 2.3,               // Total frame time (ms)
-  sleeping: false,            // Whether simulation is sleeping
-  labelCount: 150,            // Number of visible labels
-  imageAtlasUsage: 0.45,      // Texture atlas usage (0-1)
-  imageCacheSize: 120,        // Number of cached images
-  imageLoadQueue: 0,          // Images waiting to load
-  drawCalls: 3,               // Number of GPU draw calls
-  vertices: 1200,             // Number of vertices sent to GPU
-  indices: 3456               // Number of indices sent to GPU
+  nodeCount: 150,       // Number of nodes in the graph
+  linkCount: 200,       // Number of links in the graph
+  fps: 60,              // Rolling average of frames per second
+  frameMs: 2.3,         // Rolling average of frame time (ms)
+  physicsMs: 0.8,       // Time spent in the physics step of the last frame (ms)
+  renderMs: 1.2,        // Time spent in the GPU render pass (ms)
+  sleeping: false       // Whether the simulation is currently asleep
 }
 */
 ```
+
+The loop only steps physics and repaints while something is dirty, so `frameMs` near zero together with `sleeping: true` means the graph is idle and costing almost nothing.
 
 ### Frame Timing API
 ```ts
@@ -204,10 +198,10 @@ graph.on('hover', event => {
   }
 });
 
-graph.on('hoverend', event => {
-  if (event.nodeId) {
-    // Hide connections unless needed
-    hideConnectionsUnlessSelected(event.nodeId);
+graph.on('hover', event => {
+  if (event.nodeIndex < 0) {
+    // Pointer left every node: hide connections unless selected
+    hideConnectionsUnlessSelected();
   }
 });
 ```
@@ -223,66 +217,33 @@ graph.on('hoverend', event => {
 //    - PNG for graphics with transparency
 //    - WebP for best compression (browser permitting)
 
-// 3. Implement image caching strategies
-graph.setImageOptions({
-  cacheSize: 300,          // Reduce from default 500 if memory is tight
-  maxAtlasSize: 1024,      // Keep at 1024 unless you need more
-  defaultMode: 'contain'   // 'contain' sometimes requires less texture space than 'cover'
+// 3. Keep the atlas small: it holds 64 concurrent images in fixed 128px cells
+//    and there is no size or cache configuration. Reuse the same URL across
+//    nodes (deduplicated), serve images near 128x128px, and rely on automatic
+//    slot recycling: a URL dropped by every rendered frame frees its slot.
+
+// 4. Load images on demand by computing visibility yourself
+const imageUrls = new Map(); // nodeId -> url, your application data
+
+graph.on('pointerup', () => {
+  const center = graph.screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+  // ... pick the ids your app considers visible and assign their images
+  // graph.setNodeImage(id, imageUrls.get(id));
 });
 
-// 4. Lazy load images
-const visibleImageNodes = new Set();
-
-graph.on('viewportchange', event => {
-  // Calculate which nodes are currently visible
-  const visibleNodes = calculateVisibleNodes(event.visibleNodes);
-  
-  // Find newly visible nodes that need images
-  const newlyVisible = visibleNodes.filter(
-    id => !visibleImageNodes.has(id) && 
-          getNode(id).imageUrl
-  );
-  
-  // Find nodes that are no longer visible
-  const noLongerVisible = [...visibleImageNodes].filter(
-    id => !visibleNodes.has(id)
-  );
-  
-  // Load images for newly visible nodes
-  newlyVisible.forEach(nodeId => {
-    const node = getNode(nodeId);
-    if (node.imageUrl) {
-      graph.setNodeImage(nodeId, node.imageUrl);
-    }
-  });
-  
-  // Optionally: unload images for non-visible nodes (careful with this!)
-  // noLongerVisible.forEach(nodeId => {
-  //   // Only unload if we're sure we won't need it soon
-  //   if (shouldUnloadImage(nodeId)) {
-  //     graph.setNodeImage(nodeId, null);
-  //   }
-  // });
-  
-  visibleImageNodes.clear();
-  visibleImageNodes = new Set(visibleNodes);
-});
-
-// 5. Use placeholders to avoid layout shifts
-graph.setImageOptions({
-  loadingPlaceholder: '/placeholders/avatar-placeholder.png',
-  errorPlaceholder: '/placeholders/avatar-error.png'
-});
+// 5. There is no placeholder option: nodes render their fill color until the
+//    image arrives. To avoid a visible pop, await graph.loadImages() before
+//    revealing the container, or listen for imageerror and style the node.
 
 // 6. Batch image updates to minimize atlas rebuilds
 function batchSetNodeImages(imageUpdates) {
   // imageUpdates = [{nodeId: 'a', url: 'url1'}, {nodeId: 'b', url: 'url2'}, ...]
-  
-  // Graphium batches internally, but we can help by:
+
+  // The atlas uploads once per frame at most, but helping it still pays off:
   // 1. Grouping updates by time
   // 2. Avoiding updates during animations
   // 3. Using requestAnimationFrame for non-urgent updates
-  
+
   imageUpdates.forEach(update => {
     requestAnimationFrame(() => {
       graph.setNodeImage(update.nodeId, update.url);
@@ -319,10 +280,9 @@ graph.on('hover', event => {
   }
 });
 
-graph.on('hoverend', event => {
-  if (event.nodeId) {
-    // Restore original label setting
-    // Hide tooltip instead
+graph.on('hover', event => {
+  if (event.nodeIndex < 0) {
+    // Pointer left every node: hide the tooltip
     hideTooltip();
   }
 });
@@ -444,7 +404,7 @@ graph.setTheme({
   edge: { 
     width: 1,                   // Thin lines
     arrowEnabled: false,        // Disable arrow heads
-    dashEnabled: false          // Disable dashed lines
+    style: 'solid'              // Solid lines
   }
 });
 
@@ -482,16 +442,15 @@ setInterval(() => {
 // 1. Monitor and control memory usage
 setInterval(() => {
   const stats = graph.stats();
-  
-  // Warn if using too much memory
-  if (stats.imageCacheSize > 400) {
-    console.warn(`High image cache usage: ${stats.imageCacheSize}`);
+
+  // The atlas holds at most 64 images at once and recycles freed slots
+  // automatically; track distinct image URLs in your own data if you
+  // need a usage signal.
+
+  if (stats.nodeCount > 50000) {
+    console.warn(`High node count: ${stats.nodeCount}`);
   }
-  
-  if (stats.vertices > 50000) {
-    console.warn(`High vertex count: ${stats.vertices}`);
-  }
-  
+
   // Trigger garbage collection hint (in browsers that support it)
   if (window.gc) {
     window.gc();
@@ -539,7 +498,7 @@ function reuseGraph(newData) {
     dragEnabled: true,
     zoomEnabled: true,
     panEnabled: true,
-    selectOnClick: true
+    hoverEnabled: true
   });
   
   // This avoids the overhead of creating/destroying WebGL resources
@@ -563,24 +522,25 @@ const largeSocialNetConfig = {
     sleepEnergy: 0.0002,         // Easier to sleep
     sleepFrames: 20,             // Sleeps faster
     maxNeighbors: 48,            // Hard limit on neighbors
-    edgeSeparation: 0.2          // Less edge untangling = faster
+    edgeSeparation: 0.2,         // Less edge untangling = faster
+    dragSmooth: 0.3,             // Less elastic drag
+    throwFactor: 0.8             // Less momentum
   },
-  
+
   // Rendering - minimize draw calls and state changes
   theme: {
-    node: { 
+    node: {
       radius: 8,                 // Smaller nodes
       borderWidth: 0,            // No borders
-      colorPalette: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'],
-      defaultColor: '#7f7f7f'
+      color: '#7f7f7f',          // Fallback fill when no palette color applies
+      colorPalette: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
     },
-    edge: { 
+    edge: {
       color: '#bbb',
       width: 0.8,
-      arrowEnabled: false,
-      dashEnabled: false
+      arrowEnabled: false
     },
-    label: { 
+    label: {
       enabled: false,            // Disable labels for performance
       size: 10
     },
@@ -588,23 +548,16 @@ const largeSocialNetConfig = {
     selectedRing: { width: 2 }   // Minimal selection indicator
   },
   
-  // Images - aggressive caching and limits
-  imageOptions: {
-    cacheSize: 200,
-    maxAtlasSize: 1024,
-    defaultMode: 'contain'
-  },
+  // Images - the atlas is fixed at 64 slots; keep distinct URLs low
+  // and reuse the same URL across nodes (deduplicated by the atlas)
   
   // Interaction - reduce expensive feedback
   interaction: {
-    dragSmooth: 0.3,             // Less elastic drag
-    throwFactor: 0.8,            // Less momentum
-    hoverDelay: 200,             // Longer hover delay
-    zoomWheelSpeed: 0.8,         // Less sensitive zoom
+    wheelZoomSpeed: 1.3,         // Fewer zoom steps per wheel notch
     dragEnabled: true,
     zoomEnabled: true,
     panEnabled: true,
-    selectOnClick: true
+    hoverEnabled: false          // No hover picking saves a spatial query per move
   }
 };
 
@@ -621,7 +574,6 @@ Object.entries(largeSocialNetConfig.theme).forEach(([key, value]) => {
   graph.setTheme(themeUpdate);
 });
 
-graph.setImageOptions(largeSocialNetConfig.imageOptions);
 graph.setInteraction(largeSocialNetConfig.interaction);
 ```
 
@@ -640,31 +592,32 @@ const realTimeDashboardConfig = {
     sleepEnergy: 0.0008,         // Harder to sleep = more responsive
     sleepFrames: 60,             // Takes longer to sleep
     maxNeighbors: 96,
-    edgeSeparation: 0.5          // More edge untangling for clarity
+    edgeSeparation: 0.5,         // More edge untangling for clarity
+    dragSmooth: 0.25,            // Very responsive drag
+    throwFactor: 1.5             // More momentum for natural feel
   },
-  
+
   // Rendering - prioritize clarity and update speed
   theme: {
-    node: { 
+    node: {
       radius: 12,                // Larger for readability
       borderWidth: 1,            // Thin border
-      colorPalette: ['#0066ff', '#00cc66', '#ff6600', '#cc0066', '#6600cc'],
-      defaultColor: '#999999'
+      color: '#999999',          // Fallback fill when no palette color applies
+      colorPalette: ['#0066ff', '#00cc66', '#ff6600', '#cc0066', '#6600cc']
     },
-    edge: { 
+    edge: {
       color: '#666',
       width: 1.5,
       arrowEnabled: true,
       arrowSize: 6,
-      dashEnabled: true,
-      dashArray: [4, 2]
+      style: 'dashed'
     },
-    label: { 
+    label: {
       enabled: true,
       size: 11,
       color: '#333',
       background: 'rgba(255,255,255,0.8)',
-      borderRadius: 3
+      radius: 3
     },
     hoverRing: { 
       color: '#0066ff',
@@ -676,25 +629,16 @@ const realTimeDashboardConfig = {
     }
   },
   
-  // Images - optimize for frequent updates
-  imageOptions: {
-    cacheSize: 400,
-    maxAtlasSize: 2048,          // Larger atlas for more concurrent images
-    defaultMode: 'contain'
-  },
+  // Images - reuse shared URLs so frequent updates stay inside 64 slots
   
   // Interaction - optimize for real-time feel
   interaction: {
-    dragSmooth: 0.25,            // Very responsive drag
-    throwFactor: 1.5,            // More momentum for natural feel
-    hoverDelay: 50,              // Quick hover response
-    zoomWheelSpeed: 1.2,         // Standard zoom sensitivity
-    zoomDoubleClickSpeed: 2.0,   // Aggressive zoom on double click
+    wheelZoomSpeed: 1.2,         // Standard zoom sensitivity
+    dragThreshold: 2,            // Start drags quickly
     dragEnabled: true,
     zoomEnabled: true,
     panEnabled: true,
-    selectOnClick: true,
-    multiselectModifier: 'ctrl'
+    hoverEnabled: true
   }
 };
 
@@ -725,15 +669,14 @@ const staticDiagramConfig = {
       radius: 16,                // Larger for detail
       borderWidth: 2,            // Noticeable border
       colorPalette: ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557'],
-      defaultColor: '#6c757d'
+      color: '#6c757d'
     },
     edge: { 
       color: '#6c757d',
       width: 2,
       arrowEnabled: true,
       arrowSize: 8,
-      dashEnabled: true,
-      dashArray: [6, 3]
+      style: 'dashed'
     },
     label: { 
       enabled: true,
@@ -753,22 +696,15 @@ const staticDiagramConfig = {
     }
   },
   
-  // Images - high quality
-  imageOptions: {
-    cacheSize: 100,
-    maxAtlasSize: 2048,
-    defaultMode: 'contain',
-    loadingPlaceholder: '/placeholders/high-quality-placeholder.png'
-  },
+  // Images - serve pre-resized 128px assets; no placeholder option exists,
+  // await graph.loadImages() before revealing the container
   
   // Interaction - minimal, mostly for viewing
   interaction: {
     dragEnabled: false,          // No node dragging
     zoomEnabled: true,           // Allow zooming for detail
     panEnabled: true,            // Allow panning
-    selectOnClick: false,        // No selection
-    hoverEnabled: true,          // Allow tooltips
-    hoverDelay: 100
+    hoverEnabled: true           // Allow tooltips
   }
 };
 ```
@@ -955,11 +891,11 @@ class AdaptiveQualityManager {
         this.graph.setPhysics({
           positionIterations: 1,
           repulsionRadius: 100,
-          maxNeighbors: 32
+          maxNeighbors: 32,
+          dragSmooth: 0.2
         });
         this.graph.setInteraction({
-          hoverEnabled: false,
-          dragSmooth: 0.2
+          hoverEnabled: false
         });
         break;
         
@@ -993,7 +929,7 @@ class AdaptiveQualityManager {
       case 3: // Highest quality
         this.graph.setTheme({
           node: { radius: 14, borderWidth: 2 },
-          edge: { width: 2, arrowEnabled: true, dashEnabled: true },
+          edge: { width: 2, arrowEnabled: true, style: 'dashed' },
           label: { enabled: true, size: 14, background: 'rgba(0,0,0,0.6)' },
           hoverRing: { width: 3 },
           selectedRing: { width: 4 }
@@ -1221,12 +1157,9 @@ document.addEventListener('touchmove', handler, { passive: true });
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 if (isMobile) {
-  // Reduce cache sizes
-  graph.setImageOptions({
-    cacheSize: 150,           // Reduced from 500
-    maxAtlasSize: 1024        // Keep at 1024 (most mobile GPUs support this)
-  });
-  
+  // The atlas is fixed at 64 slots; on mobile keep the number of distinct
+  // image URLs per frame low and serve pre-resized 128px assets
+
   // Simplify theme
   graph.setTheme({
     node: { radius: 10, borderWidth: 1 },
@@ -1246,9 +1179,7 @@ if (isMobile) {
   
   // Reduce interaction complexity
   graph.setInteraction({
-    hoverEnabled: false,        // Often disabled on mobile
-    dragSmooth: 0.3,
-    throwFactor: 1.0
+    hoverEnabled: false         // Often disabled on mobile
   });
 }
 
@@ -1309,7 +1240,7 @@ graph.setTheme({
   edge: { 
     width: 1, 
     arrowEnabled: false,             // Saves complex geometry calculations
-    dashEnabled: false               // Saves shader complexity
+    style: 'solid'                   // Saves shader complexity
   }
 });
 
@@ -1324,21 +1255,20 @@ if (nodeCount > 1000) {
   });
 }
 
-// 3. Reduce image cache size if memory is constrained
-graph.setImageOptions({ 
-  cacheSize: Math.max(50, 500 - Math.floor(nodeCount / 20)) 
-});
+// 3. Keep the image atlas lean: clear node images that scroll out of view
+//    with graph.setNodeImage(id, null) so their slots are recycled
 
 // 4. Disable labels for large graphs
 if (nodeCount > 500) {
   graph.setTheme({ label: { enabled: false } });
 }
 
-// 5. Use appropriate interaction settings
+// 5. Use appropriate interaction and physics settings
 graph.setInteraction({
-  hoverEnabled: nodeCount < 300,    // Disable hover for large graphs
-  dragSmooth: 0.3,                  // Less expensive than 0.42
-  throwFactor: 1.0                  // Standard momentum
+  hoverEnabled: nodeCount < 300     // Disable hover for large graphs
+});
+graph.setPhysics({
+  dragSmooth: 0.3                   // Less expensive than 0.42
 });
 ```
 
@@ -1387,15 +1317,11 @@ function resetToSafeMode() {
     hoverEnabled: false,
     dragEnabled: true,
     zoomEnabled: true,
-    panEnabled: true,
-    selectOnClick: false
+    panEnabled: true
   });
-  
-  // Image limits
-  graph.setImageOptions({
-    cacheSize: 100,
-    maxAtlasSize: 1024
-  });
+
+  // The image atlas is fixed at 64 slots; clear node images you no longer
+  // display with graph.setNodeImage(id, null) to free their slots
 }
 
 // 2. Reduce visual complexity emergency brake
@@ -1403,20 +1329,16 @@ function enablePerformanceMode() {
   // Store current state
   const originalState = {
     theme: graph.theme,
-    physics: graph.physics.options,
-    interaction: graph.interaction,
-    imageOptions: graph.imageOptions
+    physics: graph.physics.options
   };
-  
+
   // Apply minimums
   resetToSafeMode();
-  
+
   // Return function to restore original state
   return () => {
     graph.setTheme(originalState.theme);
     graph.setPhysics(originalState.physics);
-    graph.setInteraction(originalState.interaction);
-    graph.setImageOptions(originalState.imageOptions);
   };
 }
 

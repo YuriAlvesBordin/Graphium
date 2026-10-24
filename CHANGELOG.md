@@ -7,6 +7,16 @@ All notable changes to Graphium will be documented in this file.
 ### Fixed
 - The constructor now derives the WebGL clear color from the theme `background`, so a custom background passed at creation (`new Graphium(canvas, { theme: ... })`) takes effect immediately without requiring a `setTheme()` call; the rendered default background now matches the declared `#0b0e14` exactly
 
+### Documentation
+- Corrected the package name in the getting started guide: install and import now use `@yurialvesbordin/graphium`
+- Rewrote the node images guide around the real implementation: fixed 8x8 grid of 128px cells, 64 concurrent images, automatic slot recycling, CORS requirements and the `imageload`/`imageerror` payload shape
+- Documented the real `stats()` fields and removed references to non-existent image cache and atlas configuration options
+- Documented the real interaction options; drag feel (`dragSmooth`, `throwFactor`) guidance moved to physics where it belongs
+- Documented the real theme option surface in the theming guide (`node.color`, `edge.style`, label fields, `fixedRing`, `selectedEdge`)
+- Replaced references to non-existent events (`dragstart`, `hoverend`, `viewportchange`, `themechange`, per-handle `.on()`) with the real event set and accurate listener patterns
+- Documented that unknown physics presets throw a descriptive error listing the available names
+- Documented the exact WebGL2 error message in the troubleshooting section
+
 ## [2.1.1] - 2026-10-23
 
 ### Fixed

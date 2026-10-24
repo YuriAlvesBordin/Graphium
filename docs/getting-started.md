@@ -5,7 +5,7 @@ This guide will help you get started with Graphium, from installation to creatin
 ## Prerequisites
 
 - Node.js >=18.0.0
-- A modern browser with WebGL2 support (Chrome 56+, Firefox 51+, Safari 15+, Edge 79+)
+- A modern browser with WebGL2 support (Chrome 56+, Firefox 51+, Safari 15+, Edge 79+). Graphium throws a descriptive `Graphium requires a browser with WebGL2 support.` error at construction time when WebGL2 is missing.
 
 ## Installation
 
@@ -13,13 +13,13 @@ Install Graphium using your preferred package manager:
 
 ```bash
 # npm
-npm install graphium
+npm install @yurialvesbordin/graphium
 
 # Yarn
-yarn add graphium
+yarn add @yurialvesbordin/graphium
 
 # pnpm
-pnpm add graphium
+pnpm add @yurialvesbordin/graphium
 ```
 
 ## Creating Your First Graph
@@ -29,7 +29,7 @@ Let's create a simple graph with three nodes connected in a triangle.
 ### Step 1: Import Graphium
 
 ```ts
-import { Graphium } from 'graphium';
+import { Graphium } from '@yurialvesbordin/graphium';
 ```
 
 ### Step 2: Create a Graph Instance
@@ -121,9 +121,9 @@ aliceHandle
 const bobCarolHandle = graph.linkById('bob~carol~0');
 
 bobCarolHandle
-  .curve(-0.2)       // Curve counter-clockwise
-  .width(2.5)        // Make thicker
-  .color('#888');    // Change color
+  .curve(-0.2)               // Curve counter-clockwise
+  .style({ width: 2.5 })     // Make thicker
+  .color('#888');            // Change color
 ```
 
 ## Cleaning Up
@@ -144,8 +144,8 @@ graph.destroy();
 
 ## Troubleshooting
 
-### "WebGL2 is not available" error
-Ensure you're using a modern browser with WebGL2 support. Try updating your browser or using Chrome/Firefox/Edge/Safari.
+### "Graphium requires a browser with WebGL2 support." error
+The constructor throws this when the browser or context cannot provide WebGL2. Ensure you're using a modern browser with WebGL2 enabled, or that your hosting environment (headless browsers, sandboxed iframes) grants the `webgl2` context. Try updating your browser or using Chrome/Firefox/Edge/Safari.
 
 ### Graph not visible
 1. Check that your container element has dimensions (width/height > 0)

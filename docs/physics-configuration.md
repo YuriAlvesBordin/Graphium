@@ -44,10 +44,20 @@ Stiff springs, extra constraint iterations, snap into rigid arrangements.
 ### Liquid
 ```ts
 graph.usePreset('liquid');
-// { repulsion: 900, repulsionRadius: 250, springStrength: 0.03, 
+// { repulsion: 900, repulsionRadius: 250, springStrength: 0.03,
 //   gravity: 0.0015, damping: 0.98, ... }
 ```
 Heavy damping, soft springs, floating drift, slow motion.
+
+### Unknown Preset Names
+
+Passing a name that is not one of `silk`, `bouncy`, `crystal` or `liquid` throws immediately with the list of available presets, instead of failing silently:
+
+```ts
+graph.usePreset('bounncy');
+// Error: Graphium: unknown physics preset "bounncy".
+//        Available presets: silk, bouncy, crystal, liquid.
+```
 
 ## Fine-Tuning Physics Parameters
 

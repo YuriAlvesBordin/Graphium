@@ -12,22 +12,23 @@ Graphium events fall into several categories:
 
 ### Input Events
 - **Mouse/Pointer**: click, dblclick, longpress, contextmenu, pointerdown, pointerup
-- **Drag**: drag, dragstart, dragend
+- **Drag**: drag, dragend
 - **Zoom/Pan**: zoom, pan, pinch (touch)
-- **Keyboard**: keydown, keyup (when graph has focus)
+- **Hover**: hover
 
 ### Graph State Events
 - **Simulation**: sleep, wake, start, stop
 - **Data**: dataupdated
-- **View**: viewportchange
 - **Resources**: imageload, imageerror
-- **Theme**: themechange (custom implementation needed)
+- **Links**: linkclick
 
-### Handle-Specific Events
-When working with node/link handles, you can also attach events directly to specific elements:
+### Event Payloads
+Every pointer event payload carries `type`, `originalEvent`, `nodeIndex`, `nodeId`, `linkIndex`, `linkId`, `screenX`, `screenY`, `worldX` and `worldY`, so handlers can act on ids without re-picking:
 ```ts
-graph.node('alice').on('click', () => {});
-graph.linkById('alice~bob~0').on('click', () => {});
+graph.on('click', event => {
+  if (event.nodeId) console.log('clicked node', event.nodeId);
+  if (event.linkId) console.log('clicked link', event.linkId);
+});
 ```
 
 ## Basic Event Handling
@@ -62,9 +63,9 @@ graph.on('contextmenu', event => {
 
 ### Drag Events
 ```ts
-// Drag start
-graph.on('dragstart', event => {
-  console.log(`Started dragging: ${event.nodeId}`);
+// Press on a node (drag feedback starts here)
+graph.on('pointerdown', event => {
+  if (event.nodeId) console.log(`Pressed: ${event.nodeId}`);
 });
 
 // During drag
@@ -108,10 +109,13 @@ graph.on('hover', event => {
   // Show tooltip, highlight connections, etc.
 });
 
-// Hover end (mouse leaves node)
-graph.on('hoverend', event => {
-  console.log(`Stopped hovering over: ${event.nodeId}`);
-  // Hide tooltip, reset highlights
+// Hover end (the same event fires with nodeIndex -1 when the pointer
+// leaves every node, or when it leaves the canvas)
+graph.on('hover', event => {
+  if (event.nodeIndex < 0) {
+    console.log('Stopped hovering over nodes');
+    // Hide tooltip, reset highlights
+  }
 });
 ```
 
@@ -209,133 +213,57 @@ All event objects contain common properties, with additional properties specific
 ### Image Events
 | Property | Type | Description |
 |----------|------|-------------|
-| `nodeId` | String | ID of node associated with image |
+| `type` | String | `imageload` or `imageerror` |
 | `url` | String | URL of the image that loaded or failed |
-| `error` | Error\|null | Error object for imageerror events |
+| `slot` | Number | Atlas slot assigned to the image |
 
-## Working with Handles for Specific Elements
+## Working with Specific Nodes and Links
 
-### Node Handle Events
+Handles are value objects for styling and geometry; they do not carry event
+subscriptions. Subscribe on the graph and filter payloads by id:
+
 ```ts
-// Get a handle for a specific node
-const aliceHandle = graph.node('alice');
-
-// Attach events directly to this node
-aliceHandle.on('click', () => {
-  console.log('Alice was clicked!');
+// React to interactions with one specific node
+graph.on('click', event => {
+  if (event.nodeId === 'alice') {
+    console.log('Alice was clicked!');
+    highlightConnections('alice');
+  }
 });
 
-aliceHandle.on('hover', () => {
-  console.log('Mouse is over Alice');
-  // Highlight Alice's connections
-  highlightConnections('alice');
+// The hover event fires on every move and with nodeIndex -1 when the
+// pointer leaves every node or the canvas
+graph.on('hover', event => {
+  if (event.nodeId === 'alice') {
+    highlightConnections('alice');
+  } else if (event.nodeIndex < 0) {
+    resetHighlights();
+  }
 });
 
-aliceHandle.on('hoverend', () => {
-  console.log('Mouse left Alice');
-  // Reset highlights
-  resetHighlights();
+// React to a finished drag of one node
+graph.on('dragend', event => {
+  if (event.nodeId === 'alice') {
+    saveNodePosition('alice', event.worldX, event.worldY);
+  }
 });
 
-aliceHandle.on('dragend', (event) => {
-  console.log(`Alice was dragged to (${event.worldX}, ${event.worldY})`);
-  // Save position to database or update UI
-  saveNodePosition('alice', event.worldX, event.worldY);
+// Link clicks arrive through the linkclick event
+graph.on('linkclick', event => {
+  if (event.linkId === 'bob~carol~0') {
+    showLinkDetails(event.linkId);
+  }
 });
 
-// Chain multiple event listeners
-aliceHandle
-  .on('click', selectNode)
-  .on('dblclick', editNodeDetails)
-  .on('dragstart', () => console.log('Started dragging Alice'));
-```
-
-### Link Handle Events
-```ts
-// Get a handle for a specific link
-const bobCarolHandle = graph.linkById('bob~carol~0');
-
-bobCarolHandle.on('click', () => {
-  console.log('Bob-Carol link clicked!');
-  // Show link details or edit dialog
-});
-
-bobCarolHandle.on('hover', () => {
-  console.log('Mouse over Bob-Carol link');
-  highlightLink('bob~carol~0');
-});
-
-bobCarolHandle.on('hoverend', () => {
-  console.log('Mouse left Bob-Carol link');
-  resetLinkHighlight();
-});
-
-// Link-specific events
-bobCarolHandle.on('dragstart', () => {
-  console.log('Started dragging Bob-Carol link');
-  // Enter link editing mode
-  enterLinkEditMode('bob~carol~0');
-});
-
-bobCarolHandle.on('dragend', () => {
-  console.log('Ended dragging Bob-Carol link');
-  // Save new link path or control points
-  saveLinkShape('bob~carol~0');
-});
-```
-
-### Event Chaining and Composition
-```ts
-// Create reusable event handlers
-function createNodeHoverHandler(nodeId) {
-  return function(event) {
-    const node = graph.getNode(nodeId);
-    if (node) {
-      // Show detailed tooltip
-      showTooltip({
-        title: node.label,
-        content: getNodeDetails(node),
-        position: { x: event.worldX, y: event.worldY }
-      });
-      
-      // Highlight related nodes
-      highlightRelatedNodes(nodeId);
-    }
-  };
+// Handles are still the tool for styling and reading state
+const alice = graph.node('alice');
+if (alice) {
+  alice.color('#4ecdc4');
+  const snapshot = alice.snapshot; // { id, x, y, label, ... } or null
 }
-
-// Apply to multiple nodes
-importantNodes.forEach(nodeId => {
-  graph.node(nodeId)
-    .on('hover', createNodeHoverHandler(nodeId))
-    .on('hoverend', hideTooltip);
-});
-
-// Create a composite handler for multiple event types
-function createInteractiveNodeHandler(nodeId) {
-  return {
-    click: () => selectNode(nodeId),
-    dblclick: () => editNodeDetails(nodeId),
-    hover: (e) => showNodeTooltip(nodeId, e.worldX, e.worldY),
-    hoverend: () => hideTooltip(),
-    dragstart: () => console.log(`Started dragging ${nodeId}`),
-    dragend: (e) => {
-      saveNodePosition(nodeId, e.worldX, e.worldY);
-      updateConnections(nodeId);
-    }
-  };
-}
-
-// Apply the composite handler
-const handler = createInteractiveNodeHandler('important-node');
-const nodeHandle = graph.node('important-node');
-
-Object.entries(handler).forEach(([eventType, callback]) => {
-  nodeHandle.on(eventType, callback);
-});
 ```
 
-## Event Unsubscribing
+## Event Unsubscribing## Event Unsubscribing
 
 ### Manual Unsubscription
 ```ts
@@ -348,13 +276,14 @@ const stopper = graph.on('click', (event) => {
 // Later, when you no longer need the listener:
 stopper(); // Removes the listener
 
-// Works with handle events too
-const nodeStopper = graph.node('alice').on('hover', () => {
-  console.log('Hovering over Alice');
+// Listeners scoped to one node use the graph emitter plus an id check
+const isAlice = event => event.nodeId === 'alice';
+const nodeStopper = graph.on('hover', event => {
+  if (isAlice(event)) console.log('Hovering over Alice');
 });
 
 // Later:
-nodeStopper(); // Removes the hover listener for Alice
+nodeStopper(); // Removes the listener
 ```
 
 ### Batch Unsubscription
@@ -366,7 +295,9 @@ const stoppers = [];
 stoppers.push(graph.on('click', handleClick));
 stoppers.push(graph.on('dragend', handleDragEnd));
 stoppers.push(graph.on('sleep', handleSleep));
-stoppers.push(graph.node('important').on('hover', handleImportantHover));
+stoppers.push(graph.on('hover', event => {
+  if (event.nodeId === 'important') handleImportantHover(event);
+}));
 
 // Later, remove all at once
 stoppers.forEach(stopper => stopper());
@@ -379,10 +310,10 @@ stoppers = []; // Clear the array
 const controller = new AbortController();
 const { signal } = controller;
 
-// Attach listeners with signal
-graph.on('click', handler, { signal });
-graph.node('alice').on('hover', handler, { signal });
-graph.on('dragend', handler, { signal });
+// The emitter accepts only (type, listener), so wire the signal yourself
+graph.on('click', e => { if (!signal.aborted) handler(e); });
+graph.on('hover', e => { if (!signal.aborted) handler(e); });
+graph.on('dragend', e => { if (!signal.aborted) handler(e); });
 
 // Later, cancel all listeners associated with this controller
 controller.abort();
@@ -446,13 +377,12 @@ class GraphiumEvents {
   
   isStandardEvent(type) {
     const standardEvents = new Set([
-      'click', 'dblclick', 'longpress', 'contextmenu',
-      'dragstart', 'drag', 'dragend',
+      'click', 'dblclick', 'longpress', 'contextmenu', 'linkclick',
+      'drag', 'dragend', 'pointerdown', 'pointerup',
       'zoom', 'pan', 'pinch',
-      'hover', 'hoverend',
+      'hover',
       'sleep', 'wake', 'start', 'stop',
-      'dataupdated', 'imageload', 'imageerror',
-      'viewportchange'
+      'dataupdated', 'imageload', 'imageerror'
     ]);
     
     return standardEvents.has(type);
@@ -487,46 +417,21 @@ graph.on('dblclick', (event) => {
 ```ts
 // Adjust how the graph responds to user input
 graph.setInteraction({
-  // Drag settings
-  dragEnabled: true,           // Whether dragging nodes is enabled
-  dragSmooth: 0.42,           // Drag follower elasticity (0-1)
-  dragSnapToGrid: false,      // Whether to snap dragged nodes to grid
-  
-  // Zoom settings
-  zoomEnabled: true,          // Whether zoom is enabled
-  zoomWheelSpeed: 1.2,        // Mouse wheel zoom sensitivity
-  zoomPinchSpeed: 1.0,        // Touch pinch zoom sensitivity
-  zoomDoubleClickSpeed: 1.5,  // Double-click zoom factor
-  zoomToMouse: true,          // Zoom toward mouse position
-  
-  // Pan settings
+  // Gesture toggles
+  dragEnabled: true,          // Whether dragging nodes is enabled
+  zoomEnabled: true,          // Whether zooming is enabled
   panEnabled: true,           // Whether panning is enabled
-  panMouseButton: 2,          // Mouse button for panning (0=left,1=middle,2=right)
-  panDragThreshold: 5,        // Minimum pixels to drag before panning starts
-  
-  // Click settings
-  clickRadius: 10,            // Max distance from node to register as click (pixels)
-  doubleClickTimeout: 300,    // Max time between clicks for double-click (ms)
-  longPressTimeout: 500,      // Time to hold for long press (ms)
-  
-  // Hover settings
   hoverEnabled: true,         // Whether hover detection is enabled
-  hoverDelay: 100,            // Delay before triggering hover event (ms)
-  
-  // Selection settings
-  selectOnClick: true,        // Whether clicking selects nodes
-  selectOnDrag: false,        // Whether dragging selects nodes (marquee)
-  multiselectModifier: 'shift', // Key modifier for multi-select (shift, ctrl, meta)
-  
-  // Accessibility
-  enableKeyboardNavigation: true, // Whether arrow keys can navigate nodes
-  focusOutlineWidth: 2,       // Width of focus outline when navigating
-  focusOutlineColor: '#0066ff'  // Color of focus outline
-});
 
-// Get current interaction settings
-const interaction = graph.interaction;
+  // Feel tuning
+  wheelZoomSpeed: 1.2,        // Multiplier per wheel notch (higher = faster zoom)
+  dragThreshold: 4,           // Pixels of movement before a press becomes a drag
+  longPressMs: 550,           // Time to hold for a long press (ms)
+  linkHitRadius: 8            // Screen-space tolerance for clicking links (px)
+});
 ```
+
+Node drag elasticity (`dragSmooth`) and release momentum (`throwFactor`) live in the physics options, not in interaction settings: use `graph.setPhysics({ dragSmooth, throwFactor })`.
 
 ### Disabling Specific Interactions
 ```ts
@@ -535,7 +440,6 @@ graph.setInteraction({
   dragEnabled: false,
   zoomEnabled: false,
   panEnabled: false,
-  selectOnClick: false,
   hoverEnabled: false
 });
 
@@ -544,17 +448,13 @@ graph.setInteraction({
   dragEnabled: false,
   zoomEnabled: true,
   panEnabled: true,
-  selectOnClick: false,
   hoverEnabled: true
 });
 
 // Create a graph for mobile devices (adjust touch sensitivity)
 graph.setInteraction({
-  zoomWheelSpeed: 0.8,      // Less sensitive wheel zoom
-  zoomPinchSpeed: 1.2,      // More sensitive pinch zoom
-  panDragThreshold: 8,      // Require more deliberate drag to pan
-  doubleClickTimeout: 400,  // More tolerant double-click timing
-  longPressTimeout: 600     // More tolerant long press
+  wheelZoomSpeed: 1.4,      // Fewer wheel notches to zoom
+  dragThreshold: 8          // Require more deliberate drags
 });
 ```
 
@@ -725,8 +625,8 @@ graph.selectNode = (nodeId, additive = false, preserveExisting = false) => {
 let marqueeStart = null;
 let marqueeElement = null;
 
-graph.on('dragstart', event => {
-  // Only start marquee if clicking on background
+graph.on('pointerdown', event => {
+  // Only start marquee if pressing on background
   if (!event.nodeId && !event.linkId) {
     marqueeStart = { x: event.screenX, y: event.screenY };
     
@@ -798,8 +698,8 @@ graph.on('dragend', event => {
 
 ### Custom Drag Feedback
 ```ts
-// Show what will be dragged before starting
-graph.on('dragstart', event => {
+// Show what will be dragged when the press starts
+graph.on('pointerdown', event => {
   if (event.nodeId) {
     // Show preview of what's being dragged
     const node = graph.getNode(event.nodeId);
@@ -875,11 +775,10 @@ function hideDragPreview() {
 
 ### Event Listener Efficiency
 ```ts
-// Instead of attaching listeners to many individual nodes:
+// Instead of trying to attach listeners per node (handles do not emit):
 inefficientButCommonApproach:
 nodes.forEach(nodeId => {
-  graph.node(nodeId).on('hover', () => updateTooltip(nodeId));
-  graph.node(nodeId).on('hoverend', () => hideTooltip());
+  // graph.node(nodeId).on('hover', ...) does not exist
 });
 
 // Use event delegation (more efficient):
@@ -890,8 +789,8 @@ graph.on('hover', event => {
   }
 });
 
-graph.on('hoverend', event => {
-  if (event.nodeId) {
+graph.on('hover', event => {
+  if (event.nodeIndex < 0) {
     hideTooltip();
   }
 });
@@ -1388,10 +1287,10 @@ graph.on('hover', event => {
   }
 });
 
-graph.on('hoverend', event => {
-  if (event.nodeId === currentlyHoveredNode) {
-    hideNodeHighlight(event.nodeId);
-    hideConnectionsHighlight(event.nodeId);
+graph.on('hover', event => {
+  if (event.nodeIndex < 0 && currentlyHoveredNode) {
+    hideNodeHighlight(currentlyHoveredNode);
+    hideConnectionsHighlight(currentlyHoveredNode);
     currentlyHoveredNode = null;
   }
 });
@@ -1481,9 +1380,9 @@ function getLinkId(nodeId1, nodeId2) {
 let dragSource = null;
 let dragPreviewLink = null;
 
-graph.on('dragstart', event => {
+graph.on('pointerdown', event => {
   if (event.nodeId) {
-    // Remember which node we started dragging from
+    // Remember which node we started from
     dragSource = event.nodeId;
     
     // Create a preview link that follows the mouse
@@ -1496,7 +1395,8 @@ graph.on('dragstart', event => {
 graph.on('drag', event => {
   if (dragSource) {
     // Update the preview link from source to current mouse position
-    const sourcePos = graph.getWorldPosition(dragSource);
+    const sourceSnapshot = graph.getNode(dragSource);
+    const sourcePos = sourceSnapshot ? { x: sourceSnapshot.x, y: sourceSnapshot.y } : null;
     updatePreviewLink(dragPreviewLink, sourcePos.x, sourcePos.y, 
                      event.worldX, event.worldY);
   }
@@ -1610,9 +1510,9 @@ graph.on('hover', event => {
   }
 });
 
-graph.on('hoverend', event => {
-  // Only reset to background if we were hovering over something
-  if (event.nodeId || event.linkId) {
+graph.on('hover', event => {
+  // nodeIndex -1 means the pointer left every node
+  if (event.nodeIndex < 0 && currentContext !== 'background') {
     updateContextToolbar('background');
     currentContext = 'background';
   }
@@ -1679,22 +1579,20 @@ function updateContextToolbar(context) {
 | `dblclick` | Double click/tap | `nodeId`, `linkId`, `worldX`, `worldY` |
 | `longpress` | Long press/touch and hold | `nodeId`, `linkId`, `worldX`, `worldY` |
 | `contextmenu` | Right click or long press (menu trigger) | `nodeId`, `linkId`, `worldX`, `worldY` |
-| `dragstart` | Start of drag operation | `nodeId`, `linkId`, `worldX`, `worldY` |
 | `drag` | During drag operation | `nodeId`, `linkId`, `worldX`, `worldY`, `vx`, `vy` |
 | `dragend` | End of drag operation | `nodeId`, `linkId`, `worldX`, `worldY`, `vx`, `vy` |
 | `zoom` | Mouse wheel zoom or pinch gesture | `zoomLevel`, `worldX`, `worldY` |
 | `pan` | Dragging background to pan view | `dx`, `dy`, `centerX`, `centerY` |
 | `pinch` | Touch pinch gesture | `scale`, `focalPointX`, `focalPointY` |
 | `hover` | Mouse pointer enters node | `nodeId`, `worldX`, `worldY` |
-| `hoverend` | Mouse pointer leaves node | `nodeId`, `worldX`, `worldY` |
 | `sleep` | Physics simulation has stabilized | `sleeping` (true) |
 | `wake` | Physics simulation started after sleep | `sleeping` (false) |
 | `start` | Physics simulation started manually | - |
 | `stop` | Physics simulation stopped manually | - |
 | `dataupdated` | Graph data has changed (nodes/links modified) | - |
-| `imageload` | Image successfully loaded | `nodeId`, `url` |
-| `imageerror` | Image failed to load | `nodeId`, `url`, `error` |
-| `viewportchange` | Visible area of graph has changed | `visibleNodes`, `visibleLinks` |
+| `imageload` | Image successfully loaded | `url`, `slot` |
+| `imageerror` | Image failed to load | `url`, `slot` |
+| `linkclick` | A link was clicked | `linkIndex`, `linkId` |
 
 ### Mouse Properties (available on pointer events)
 | Property | Description |
@@ -1758,8 +1656,8 @@ class AppState {
       this.updateUI();
     });
     
-    this.graph.on('hoverend', event => {
-      if (this.derivedState.hoveredNode === event.nodeId) {
+    this.graph.on('hover', event => {
+      if (event.nodeIndex < 0) {
         this.derivedState.hoveredNode = null;
         this.updateUI();
       }
@@ -1834,8 +1732,8 @@ class SyncedGraphManager {
       this.updateUI();
     });
     
-    this.graph.on('hoverend', event => {
-      if (this.hoveredNode === event.nodeId) {
+    this.graph.on('hover', event => {
+      if (event.nodeIndex < 0) {
         this.hoveredNode = null;
         this.updateUI();
       }
@@ -1911,9 +1809,9 @@ class EventLogger {
   setupLogging() {
     const eventsToLog = [
       'click', 'dblclick', 'longpress', 'contextmenu',
-      'dragstart', 'drag', 'dragend',
+      'drag', 'dragend', 'pointerdown', 'pointerup',
       'zoom', 'pan', 'pinch',
-      'hover', 'hoverend',
+      'hover',
       'sleep', 'wake', 'start', 'stop',
       'dataupdated', 'imageload', 'imageerror'
     ];
@@ -2034,9 +1932,8 @@ function clearDebugVisuals() {
 // User interaction
 graph.on('click', handler);           // Primary action
 graph.on('dblclick', handler);        // Secondary action/edit
-graph.on('hover', handler);           // Show tooltip/preview
-graph.on('hoverend', handler);        // Hide tooltip/preview
-graph.on('dragstart', handler);       // Start drag feedback
+graph.on('hover', handler);           // Show tooltip/preview (nodeIndex -1 on leave)
+graph.on('pointerdown', handler);     // Start press/drag feedback
 graph.on('drag', handler);            // Update drag preview
 graph.on('dragend', handler);         // Finalize drag action
 
@@ -2056,9 +1953,6 @@ graph.on('dataupdated', handler);     // Data changed - update dependent state
 graph.on('imageload', handler);       // Image loaded successfully
 graph.on('imageerror', handler);      // Image failed - show fallback
 
-// Advanced
-graph.on('select', handler);          // Selection changed (custom event)
-graph.on('viewportchange', handler);  // Visible items changed
 ```
 
 ### Event Properties You'll Use Most Often
