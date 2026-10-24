@@ -2,6 +2,18 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.1.1] - 2026-10-23
+
+### Fixed
+- Spatial hash no longer hangs when items spread across more distinct cells than the initial table capacity; the cell table now grows during rebuild
+- Hover highlight now repaints on fully settled (sleeping) graphs by moving the appearance revision
+- Texture atlas recycles freed slots after sweep, so node images keep loading after the first 64 distinct URLs; pending cleanup no longer leaves loadAll unresolved and late image loads cannot paint into a recycled slot
+- Clear error message when WebGL2 is unavailable instead of a TypeError inside the texture atlas
+- Unknown physics preset names fail with a readable error listing the available presets
+- The resize observer is disconnected on destroy()
+- Node picking falls back to a linear scan before the physics spatial hash is built, so dragging and clicking work with autoStart disabled
+- Label culling compares CSS pixel bounds on HiDPI screens, avoiding up to twice the necessary label work
+
 ## [2.1.0] - 2026-10-23
 
 ### Added
