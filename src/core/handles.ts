@@ -50,6 +50,42 @@ export class NodeHandle {
     return this;
   }
 
+  /** Scales this node's label text relative to the effective label size. */
+  labelScale(value: number): this {
+    this.graph.editor.setNodeAppearance(this.id, { labelScale: value });
+    return this;
+  }
+
+  /** Sets an absolute label font size override for this node. */
+  labelSize(value: number): this {
+    this.graph.editor.setNodeAppearance(this.id, { labelSize: value });
+    return this;
+  }
+
+  /** Tints this node's label text. */
+  labelColor(color: string): this {
+    this.graph.editor.setNodeAppearance(this.id, { labelColor: color });
+    return this;
+  }
+
+  /** Sets the label font weight for this node. */
+  labelWeight(weight: number | string): this {
+    this.graph.editor.setNodeAppearance(this.id, { labelWeight: weight });
+    return this;
+  }
+
+  /** Sets the label font family for this node. */
+  labelFont(font: string): this {
+    this.graph.editor.setNodeAppearance(this.id, { labelFont: font });
+    return this;
+  }
+
+  /** Sets a label background for this node; null forces none over the theme. */
+  labelBackground(background: string | null): this {
+    this.graph.editor.setNodeAppearance(this.id, { labelBackground: background });
+    return this;
+  }
+
   /** Sets the node image from a URL or data URL. */
   image(url: string | null, mode: 'cover' | 'contain' = 'cover'): this {
     this.graph.setNodeImage(this.id, url, mode);

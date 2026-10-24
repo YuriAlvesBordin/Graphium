@@ -133,7 +133,7 @@ for (const field of ['model', 'physics', 'camera', 'renderer', 'atlas', 'labels'
 }
 
 // Handle surface.
-for (const name of ['style', 'move', 'fix', 'select', 'state', 'label', 'image', 'color', 'radius', 'data', 'remove']) {
+for (const name of ['style', 'move', 'fix', 'select', 'state', 'label', 'labelScale', 'labelSize', 'labelColor', 'labelWeight', 'labelFont', 'labelBackground', 'image', 'color', 'radius', 'data', 'remove']) {
   checkMethod('NodeHandle', graphium.NodeHandle.prototype, name);
 }
 for (const name of ['style', 'curve', 'restLength', 'dashed', 'color', 'select', 'data', 'remove']) {

@@ -250,6 +250,39 @@ graph.node('user123')
   .select();                       // Select it
 ```
 
+### Per-Node Label Customization
+
+Every node can carry its own label styling. Unset fields fall back to the theme, so the theme stays the global default and nodes only override what makes them special:
+
+```ts
+// Bigger hub: text grows with the node through a simple scale factor
+graph.node('hub').labelScale(1.5);
+
+// Full control per node
+graph.node('warning')
+  .labelSize(18)                          // Absolute font size override
+  .labelColor('#ffd166')                  // Text color
+  .labelWeight(700)                       // Font weight
+  .labelFont('Georgia, serif')            // Font family
+  .labelBackground('rgba(0,0,0,0.6)');    // Own background box
+
+// null forces no background even when the theme defines one
+graph.node('minimal').labelBackground(null);
+
+// Or set everything at creation / through style()
+graph.addNode('a', { label: 'Nota', radius: 22, labelScale: 1.4, labelColor: '#9be7c4' });
+graph.node('a').style({ labelWeight: 600 });
+```
+
+| Handle shortcut  | Node option         | Falls back to        |
+| ---------------- | ------------------- | -------------------- |
+| `labelScale(v)`  | `labelScale`        | `1`                  |
+| `labelSize(v)`   | `labelSize`         | `label.size`         |
+| `labelColor(v)`  | `labelColor`        | `label.color`        |
+| `labelWeight(v)` | `labelWeight`       | `label.weight`       |
+| `labelFont(v)`   | `labelFont`         | `label.font`         |
+| `labelBackground(v)` | `labelBackground` | `label.background` (null = none) |
+
 ### Per-Link Styling
 ```ts
 // Style a specific link

@@ -116,3 +116,37 @@ describe('Node and Link handles', () => {
     expect(graph.getLink('ab')).toBeNull();
   });
 });
+
+describe('Node handle label styling shortcuts', () => {
+  let graph: Graphium;
+
+  beforeEach(() => {
+    graph = new Graphium({ autoStart: false, autoResize: false, interaction: false });
+    graph.addNode('a', { x: 0, y: 0, label: 'A' });
+  });
+
+  afterEach(() => {
+    graph.destroy();
+  });
+
+  it('should customize label styling through handle shortcuts', () => {
+    const handle = graph.node('a') as NodeHandle;
+    const result = handle
+      .labelScale(1.5)
+      .labelSize(16)
+      .labelColor('#ff0000')
+      .labelWeight(300)
+      .labelFont('Georgia, serif')
+      .labelBackground('rgba(0,0,0,0.4)');
+    expect(result).toBe(handle);
+    const index = graph.model.nodeIndexOf('a');
+    expect(graph.model.nodeLabelScale[index]).toBe(1.5);
+    expect(graph.model.nodeLabelSize[index]).toBe(16);
+    expect(graph.model.nodeLabelColor[index]).toBe('#ff0000');
+    expect(graph.model.nodeLabelWeight[index]).toBe(300);
+    expect(graph.model.nodeLabelFont[index]).toBe('Georgia, serif');
+    expect(graph.model.nodeLabelBackground[index]).toBe('rgba(0,0,0,0.4)');
+    handle.labelBackground(null);
+    expect(graph.model.nodeLabelBackground[index]).toBeNull();
+  });
+});

@@ -120,6 +120,12 @@ export class GraphModel {
   nodeImage: Array<string | null>;
   nodeImageMode: Uint8Array;
   nodeLabel: Array<string | null>;
+  nodeLabelSize: Float32Array;
+  nodeLabelScale: Float32Array;
+  nodeLabelColor: Array<string | undefined>;
+  nodeLabelWeight: Array<number | string | undefined>;
+  nodeLabelFont: Array<string | undefined>;
+  nodeLabelBackground: Array<string | null | undefined>;
   flags: Uint8Array;
   state: Uint8Array;
 
@@ -187,6 +193,12 @@ export class GraphModel {
     this.nodeImage = new Array(this.nodeCapacity).fill(null);
     this.nodeImageMode = new Uint8Array(this.nodeCapacity);
     this.nodeLabel = new Array(this.nodeCapacity).fill(null);
+    this.nodeLabelSize = new Float32Array(this.nodeCapacity);
+    this.nodeLabelScale = new Float32Array(this.nodeCapacity).fill(1);
+    this.nodeLabelColor = new Array(this.nodeCapacity).fill(undefined);
+    this.nodeLabelWeight = new Array(this.nodeCapacity).fill(undefined);
+    this.nodeLabelFont = new Array(this.nodeCapacity).fill(undefined);
+    this.nodeLabelBackground = new Array(this.nodeCapacity).fill(undefined);
     this.flags = new Uint8Array(this.nodeCapacity);
     this.state = new Uint8Array(this.nodeCapacity);
     this.source = new Int32Array(this.linkCapacity);
@@ -339,6 +351,25 @@ export class GraphModel {
     }
     if (isNew || options.label !== undefined) {
       this.nodeLabel[index] = options.label === undefined || options.label === null ? null : String(options.label);
+    }
+    if (isNew || options.labelSize !== undefined) {
+      const size = finiteOr(options.labelSize, 0);
+      this.nodeLabelSize[index] = size > 0 ? Math.max(1, size) : 0;
+    }
+    if (isNew || options.labelScale !== undefined) {
+      this.nodeLabelScale[index] = Math.max(0.1, finiteOr(options.labelScale, 1));
+    }
+    if (isNew || options.labelColor !== undefined) {
+      this.nodeLabelColor[index] = options.labelColor;
+    }
+    if (isNew || options.labelWeight !== undefined) {
+      this.nodeLabelWeight[index] = options.labelWeight;
+    }
+    if (isNew || options.labelFont !== undefined) {
+      this.nodeLabelFont[index] = options.labelFont;
+    }
+    if (isNew || options.labelBackground !== undefined) {
+      this.nodeLabelBackground[index] = options.labelBackground;
     }
     if (options.fixed !== undefined) {
       if (options.fixed) {
@@ -609,6 +640,12 @@ export class GraphModel {
       this.nodeImage[index] = this.nodeImage[last];
       this.nodeImageMode[index] = this.nodeImageMode[last];
       this.nodeLabel[index] = this.nodeLabel[last];
+      this.nodeLabelSize[index] = this.nodeLabelSize[last];
+      this.nodeLabelScale[index] = this.nodeLabelScale[last];
+      this.nodeLabelColor[index] = this.nodeLabelColor[last];
+      this.nodeLabelWeight[index] = this.nodeLabelWeight[last];
+      this.nodeLabelFont[index] = this.nodeLabelFont[last];
+      this.nodeLabelBackground[index] = this.nodeLabelBackground[last];
       this.flags[index] = this.flags[last];
       this.state[index] = this.state[last];
       for (let link = 0; link < this.linkCount; link++) {
@@ -624,6 +661,12 @@ export class GraphModel {
     this.nodeData.length = this.nodeCount - 1;
     this.nodeImage[this.nodeCount - 1] = null;
     this.nodeLabel[this.nodeCount - 1] = null;
+    this.nodeLabelSize[this.nodeCount - 1] = 0;
+    this.nodeLabelScale[this.nodeCount - 1] = 1;
+    this.nodeLabelColor[this.nodeCount - 1] = undefined;
+    this.nodeLabelWeight[this.nodeCount - 1] = undefined;
+    this.nodeLabelFont[this.nodeCount - 1] = undefined;
+    this.nodeLabelBackground[this.nodeCount - 1] = undefined;
     this.nodeCount--;
     this.topologyRevision++;
     this.appearanceRevision++;
@@ -752,6 +795,14 @@ export class GraphModel {
     this.nodeImage = growObjects(this.nodeImage, capacity);
     this.nodeImageMode = growUint8(this.nodeImageMode, capacity);
     this.nodeLabel = growObjects(this.nodeLabel, capacity);
+    this.nodeLabelSize = grow(this.nodeLabelSize, capacity);
+    const nextLabelScale = new Float32Array(capacity).fill(1);
+    nextLabelScale.set(this.nodeLabelScale);
+    this.nodeLabelScale = nextLabelScale;
+    this.nodeLabelColor = growObjects(this.nodeLabelColor, capacity);
+    this.nodeLabelWeight = growObjects(this.nodeLabelWeight, capacity);
+    this.nodeLabelFont = growObjects(this.nodeLabelFont, capacity);
+    this.nodeLabelBackground = growObjects(this.nodeLabelBackground, capacity);
     this.flags = growUint8(this.flags, capacity);
     this.state = growUint8(this.state, capacity);
     this.nodeCapacity = capacity;

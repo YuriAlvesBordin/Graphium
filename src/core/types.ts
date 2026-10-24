@@ -16,6 +16,18 @@ export interface NodeOptions {
   x?: number;
   y?: number;
   label?: string | null;
+  /** Absolute label font size override for this node; falls back to the theme. */
+  labelSize?: number;
+  /** Multiplier applied over the effective label size for this node (default 1). */
+  labelScale?: number;
+  /** Label text color for this node; falls back to the theme. */
+  labelColor?: string;
+  /** Label font weight for this node; falls back to the theme. */
+  labelWeight?: number | string;
+  /** Label font family for this node; falls back to the theme. */
+  labelFont?: string;
+  /** Label background for this node; null forces none even when the theme has one. */
+  labelBackground?: string | null;
   color?: ColorInput;
   borderColor?: ColorInput;
   borderWidth?: number;

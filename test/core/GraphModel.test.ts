@@ -578,3 +578,80 @@ describe('GraphModel', () => {
     expect(Number.isFinite(model.x[0])).toBe(true);
   });
 });
+
+describe('per-node label styling', () => {
+  it('should store per-node label style options', () => {
+    const model = makeModel();
+    model.addNode('a', {
+      label: 'Alpha',
+      labelSize: 18,
+      labelColor: '#ff0000',
+      labelWeight: 700,
+      labelFont: 'Georgia, serif',
+      labelBackground: 'rgba(0,0,0,0.5)',
+    });
+    expect(model.nodeLabelSize[0]).toBe(18);
+    expect(model.nodeLabelColor[0]).toBe('#ff0000');
+    expect(model.nodeLabelWeight[0]).toBe(700);
+    expect(model.nodeLabelFont[0]).toBe('Georgia, serif');
+    expect(model.nodeLabelBackground[0]).toBe('rgba(0,0,0,0.5)');
+  });
+
+  it('should default label styling to the theme fallbacks', () => {
+    const model = makeModel();
+    model.addNode('a', { label: 'A' });
+    expect(model.nodeLabelSize[0]).toBe(0); // 0 = inherit the theme size
+    expect(model.nodeLabelScale[0]).toBe(1);
+    expect(model.nodeLabelColor[0]).toBeUndefined();
+    expect(model.nodeLabelWeight[0]).toBeUndefined();
+    expect(model.nodeLabelFont[0]).toBeUndefined();
+    expect(model.nodeLabelBackground[0]).toBeUndefined();
+  });
+
+  it('should clamp label size and scale to usable ranges', () => {
+    const model = makeModel();
+    model.addNode('a', { label: 'A', labelSize: -5, labelScale: 0 });
+    expect(model.nodeLabelSize[0]).toBe(0); // non-positive falls back to inherit
+    expect(model.nodeLabelScale[0]).toBeCloseTo(0.1); // clamped minimum scale
+    model.addNode('b', { label: 'B', labelSize: 0.2, labelScale: 99 });
+    expect(model.nodeLabelSize[1]).toBe(1); // clamped minimum size
+    expect(model.nodeLabelScale[1]).toBe(99);
+  });
+
+  it('should update label styling through node updates', () => {
+    const model = makeModel();
+    model.addNode('a', { label: 'A' });
+    model.updateNode(0, { labelScale: 2 });
+    expect(model.nodeLabelScale[0]).toBe(2);
+    model.updateNode(0, { labelBackground: null });
+    expect(model.nodeLabelBackground[0]).toBeNull();
+  });
+
+  it('should move label styling on swap-remove and clear the tail', () => {
+    const model = makeModel();
+    model.addNode('a', { label: 'A' });
+    model.addNode('b', { label: 'B', labelSize: 20, labelScale: 1.5, labelColor: '#ffffff' });
+    model.addNode('c', { label: 'C' });
+    model.removeNode('a');
+    // Swap-remove moves the last node (c) into the freed slot 0.
+    expect(model.nodeLabel[0]).toBe('C');
+    expect(model.nodeLabel[1]).toBe('B');
+    expect(model.nodeLabelSize[1]).toBe(20);
+    expect(model.nodeLabelScale[1]).toBe(1.5);
+    expect(model.nodeLabelColor[1]).toBe('#ffffff');
+    expect(model.nodeLabelSize[2]).toBe(0);
+    expect(model.nodeLabelScale[2]).toBe(1);
+    expect(model.nodeLabelColor[2]).toBeUndefined();
+  });
+
+  it('should keep the identity label scale when growing capacity', () => {
+    const model = makeModel(16);
+    for (let i = 0; i < 20; i++) {
+      model.addNode(`n${i}`, { label: `N${i}`, labelScale: 1.25 });
+    }
+    expect(model.nodeLabelScale.length).toBeGreaterThanOrEqual(20);
+    expect(model.nodeLabelScale[19]).toBe(1.25);
+    model.addNode('late', { label: 'Late' });
+    expect(model.nodeLabelScale[20]).toBe(1);
+  });
+});

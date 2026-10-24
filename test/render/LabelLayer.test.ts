@@ -200,3 +200,107 @@ describe('LabelLayer background branches', () => {
     expect(element.style.padding).toBe('0px');
   });
 });
+
+describe('LabelLayer per-node styling', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('should override font size, weight, family and color per node', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('a', {
+      x: 0,
+      y: 0,
+      label: 'Custom',
+      labelSize: 18,
+      labelWeight: 700,
+      labelFont: 'Georgia, serif',
+      labelColor: '#ff8800',
+    });
+    layer.update();
+    const element = layer.container.firstElementChild as HTMLElement;
+    expect(element.style.fontSize).toBe('18px');
+    expect(element.style.fontWeight).toBe('700');
+    expect(element.style.fontFamily).toContain('Georgia');
+    expect(element.style.color).toBe('rgb(255, 136, 0)');
+  });
+
+  it('should multiply the theme size by the node label scale', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('a', { x: 0, y: 0, label: 'Scaled', labelScale: 2 });
+    layer.update();
+    const element = layer.container.firstElementChild as HTMLElement;
+    expect(element.style.fontSize).toBe('23px'); // 11.5 * 2
+  });
+
+  it('should keep theme styling for nodes without overrides', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('a', { x: 0, y: 0, label: 'Theme' });
+    layer.update();
+    const element = layer.container.firstElementChild as HTMLElement;
+    expect(element.style.fontSize).toBe(`${DEFAULT_THEME.labelSize}px`);
+    expect(element.style.color).toBe('rgb(201, 210, 227)');
+  });
+
+  it('should give a node its own background over the theme', () => {
+    const { layer, model } = makeLayer({ label: { background: 'rgba(9,9,9,0.9)' } });
+    model.addNode('plain', { x: 0, y: 0, label: 'Plain' });
+    model.addNode('boxed', { x: 200, y: 0, label: 'Boxed', labelBackground: 'rgba(0,128,0,0.8)' });
+    model.addNode('clear', { x: 400, y: 0, label: 'Clear', labelBackground: null });
+    layer.update();
+    const children = layer.container.children;
+    expect((children[0] as HTMLElement).style.background).toBe('rgba(9, 9, 9, 0.9)');
+    expect((children[1] as HTMLElement).style.background).toBe('rgba(0, 128, 0, 0.8)');
+    expect((children[2] as HTMLElement).style.background).toBe('none');
+    expect((children[2] as HTMLElement).style.padding).toBe('0px');
+  });
+
+  it('should show a themed background only where the theme has one', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('plain', { x: 0, y: 0, label: 'Plain' });
+    model.addNode('boxed', { x: 200, y: 0, label: 'Boxed', labelBackground: 'rgba(0,0,255,0.5)' });
+    layer.update();
+    const children = layer.container.children;
+    expect((children[0] as HTMLElement).style.background).toBe('none');
+    expect((children[1] as HTMLElement).style.background).toBe('rgba(0, 0, 255, 0.5)');
+    expect((children[1] as HTMLElement).style.padding).toBe('4px 8px');
+  });
+
+  it('should skip restyling a slot while the effective style is unchanged', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('a', { x: 0, y: 0, label: 'Stable', labelColor: '#112233' });
+    layer.update();
+    const element = layer.container.firstElementChild as HTMLElement;
+    element.style.color = 'rgb(1, 2, 3)'; // simulate external tampering
+    layer.update();
+    // The style key matched, so the layer did not rewrite the color.
+    expect(element.style.color).toBe('rgb(1, 2, 3)');
+  });
+
+  it('should reapply styles after a theme change', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('a', { x: 0, y: 0, label: 'Themed' });
+    layer.update();
+    layer.theme = resolveTheme({ label: { size: 20, color: '#abcdef' } });
+    layer.applyTheme();
+    layer.update();
+    const element = layer.container.firstElementChild as HTMLElement;
+    expect(element.style.fontSize).toBe('20px');
+    expect(element.style.color).toBe('rgb(171, 205, 239)');
+  });
+});
+
+describe('LabelLayer per-node styling fallbacks', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('should fall back to the theme size when a node scale is not positive', () => {
+    const { layer, model } = makeLayer();
+    model.addNode('a', { x: 0, y: 0, label: 'Zero', labelScale: 2 });
+    model.nodeLabelScale[0] = 0; // defensive default for unwritten slots
+    layer.update();
+    const element = layer.container.firstElementChild as HTMLElement;
+    expect(element.style.fontSize).toBe(`${DEFAULT_THEME.labelSize}px`);
+  });
+});

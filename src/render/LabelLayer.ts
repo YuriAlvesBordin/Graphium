@@ -2,6 +2,10 @@
  * Renders node labels as a pooled set of DOM elements positioned over the
  * canvas. The pool keeps at most a fixed number of elements alive, updates
  * transforms without layout thrash and hides labels below a zoom threshold.
+ *
+ * Every node can override its own label styling (`labelSize`, `labelScale`,
+ * `labelColor`, `labelWeight`, `labelFont`, `labelBackground`); unset fields
+ * fall back to the theme, so the theme stays the global default.
  */
 
 import { GraphModel, NODE_DIM, NODE_HIDDEN } from '../core/GraphModel.js';
@@ -20,6 +24,7 @@ export class LabelLayer {
   private pool: HTMLDivElement[] = [];
   private activeCount = 0;
   private screen = { x: 0, y: 0 };
+  private styleKeys: string[] = [];
 
   constructor(parent: HTMLElement, theme: ThemeResolved) {
     this.theme = theme;
@@ -54,6 +59,8 @@ export class LabelLayer {
         element.style.padding = '0';
       }
     }
+    // Pool styles were reset: force per-node styles to reapply next update.
+    this.styleKeys.length = 0;
   }
 
   /** Registers the model and camera the layer reads positions from. */
@@ -92,6 +99,7 @@ export class LabelLayer {
       if (screenX < -margin || screenX > cssWidth + margin || screenY < -margin || screenY > cssHeight + margin) {
         continue;
       }
+      const slot = used;
       const element = this.acquire(used++);
       const offset = (model.visualRadius[index] * camera.zoom) / dpr;
       let top = screenY;
@@ -105,11 +113,45 @@ export class LabelLayer {
       }
       element.style.display = '';
       element.style.transform = `translate3d(${screenX.toFixed(1)}px, ${top.toFixed(1)}px, 0) translate(-50%, -50%)`;
+      this.applyNodeStyle(element, slot, model, index);
     }
     for (let index = used; index < this.activeCount; index++) {
       this.pool[index].style.display = 'none';
     }
     this.activeCount = used;
+  }
+
+  /** Applies one node's effective label style when it differs from the pool slot. */
+  private applyNodeStyle(element: HTMLDivElement, slot: number, model: GraphModel, index: number): void {
+    const size = (model.nodeLabelSize[index] || this.theme.labelSize) * (model.nodeLabelScale[index] || 1);
+    const weight = model.nodeLabelWeight[index] ?? this.theme.labelWeight;
+    const family = model.nodeLabelFont[index] ?? this.theme.labelFont;
+    const font = `${weight} ${size}px ${family}`;
+    const color = model.nodeLabelColor[index] ?? this.theme.labelColor;
+    const background = model.nodeLabelBackground[index];
+    const styleKey = `${font}\u0000${color}\u0000${background ?? ''}`;
+    if (this.styleKeys[slot] === styleKey) {
+      return;
+    }
+    this.styleKeys[slot] = styleKey;
+    element.style.fontWeight = String(weight);
+    element.style.fontSize = `${size}px`;
+    element.style.fontFamily = family;
+    element.style.color = color;
+    if (background === null) {
+      element.style.background = 'none';
+      element.style.padding = '0';
+      return;
+    }
+    const themed = background ?? this.theme.labelBackground;
+    if (themed) {
+      element.style.background = themed;
+      element.style.padding = `${this.theme.labelPadding[1]}px ${this.theme.labelPadding[0]}px`;
+      element.style.borderRadius = `${this.theme.labelRadius}px`;
+    } else {
+      element.style.background = 'none';
+      element.style.padding = '0';
+    }
   }
 
   /** Returns a styled pool element, creating new ones only when needed. */
@@ -152,6 +194,7 @@ export class LabelLayer {
       element.remove();
     }
     this.pool.length = 0;
+    this.styleKeys.length = 0;
     this.activeCount = 0;
     this.container.remove();
   }
