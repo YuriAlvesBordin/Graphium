@@ -17,6 +17,9 @@ All notable changes to Graphium will be documented in this file.
 - Documented that unknown physics presets throw a descriptive error listing the available names
 - Documented the exact WebGL2 error message in the troubleshooting section
 
+### Added
+- New `constrainToViewport` camera option: when enabled, the camera stays inside a user-defined bounding box in world coordinates. Camera methods `setBounds()`, `clearBounds()`, `getBounds()` control the area. Graphium-level operations (`addNode`, `setData`, `removeNode`, etc.) automatically keep the camera within those bounds.
+
 ## [2.1.1] - 2026-10-23
 
 ### Fixed
