@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Graphium Examples</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; background: #f5f5f5; }
+    h1 { color: #333; }
+    .example-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem; }
+    .example-card { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .example-card h3 { margin-top: 0; color: #2c3e50; }
+    .example-card p { color: #666; font-size: 0.9rem; }
+    .example-card a { display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; background: #3498db; color: white; text-decoration: none; border-radius: 4px; }
+    .example-card a:hover { background: #2980b9; }
+  </style>
+</head>
+<body>
+  <h1>Graphium Examples</h1>
+  <p>These examples demonstrate various features of the Graphium library. Click on an example to view it.</p>
+  <div class="example-list">
+    <div class="example-card">
+      <h3>01 - Basic Usage</h3>
+      <p>Creating a simple graph with nodes and links.</p>
+      <a href="examples/01-basic-usage.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>02 - Fluent Interface</h3>
+      <p>Method chaining for concise code.</p>
+      <a href="examples/02-fluent-interface.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>03 - Bulk Operations</h3>
+      <p>Efficiently adding/removing many nodes and links.</p>
+      <a href="examples/03-bulk-operations.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>04 - Explicit Add (IfAbsent)</h3>
+      <p>Preventing accidental overwrites with addNodeIfAbsent/addLinkIfAbsent.</p>
+      <a href="examples/04-explicit-add.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>05 - Event Handling</h3>
+      <p>Handling clicks, hovers, and physics events with enhanced payloads.</p>
+      <a href="examples/05-event-handling.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>06 - Label Styling</h3>
+      <p>Advanced label customization: fonts, colors, padding, alignment, etc.</p>
+      <a href="examples/06-label-styling.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>07 - Export Image (PNG)</h3>
+      <p>Exporting the current view as a PNG image.</p>
+      <a href="examples/07-export-image-png.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>08 - Export Image (JPEG)</h3>
+      <p>Exporting the current view as a JPEG image.</p>
+      <a href="examples/08-export-image-jpeg.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>09 - Export JSON</h3>
+      <p>Exporting graph data as JSON (including layout).</p>
+      <a href="examples/09-export-json.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>10 - Auto Destroy (SPA)</h3>
+      <p>Automatic cleanup to prevent memory leaks in single-page applications.</p>
+      <a href="examples/10-auto-destroy.html">View Example</a>
+    </div>
+    <div class="example-card">
+      <h3>11 - Themes</h3>
+      <p>Applying theme objects for consistent styling.</p>
+      <a href="examples/11-themes.html">View Example</a>
+    </div>
+  </div>
+  <p>To run these examples locally:</p>
+  <ol>
+    <li>Ensure you have Node.js installed.</li>
+    <li>Run <code>node server.js</code> in the Graphium directory.</li>
+    <li>Open your browser to <a href="http://localhost:8080">http://localhost:8080</a>.</li>
+  </ol>
+</body>
+</html>
