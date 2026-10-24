@@ -62,20 +62,18 @@ export class Camera {
     const viewHeight = this.height / this.zoom;
 
     const contentWidth = maxX - minX;
-    if (contentWidth <= viewWidth) {
-      // O conteúdo cabe na tela: centraliza e trava, não sai da viewport.
-      this.x = (minX + maxX) * 0.5;
-    } else {
+    if (contentWidth > viewWidth) {
       // O conteúdo é maior que a tela: limita o pan para não mostrar
       // área vazia além dos extremos do conteúdo.
       const half = viewWidth * 0.5;
       this.x = Math.max(minX + half, Math.min(maxX - half, this.x));
     }
+    // Conteúdo menor que a tela: no-op. Recentralizar aqui criaria um loop
+    // de feedback com bounds que acompanham os nós em movimento; centralizar
+    // é responsabilidade de fit()/centerOn().
 
     const contentHeight = maxY - minY;
-    if (contentHeight <= viewHeight) {
-      this.y = (minY + maxY) * 0.5;
-    } else {
+    if (contentHeight > viewHeight) {
       const half = viewHeight * 0.5;
       this.y = Math.max(minY + half, Math.min(maxY - half, this.y));
     }
@@ -139,6 +137,7 @@ export class Camera {
     this.setZoom(this.zoom * factor);
     this.x = beforeX - (screenX - this.width * 0.5) / this.zoom;
     this.y = beforeY - (screenY - this.height * 0.5) / this.zoom;
+    this.clampPosition();
     this.updateMatrix();
     return this;
   }

@@ -26,6 +26,8 @@ export interface RenderLoopDeps {
   autoFit: boolean;
   /** Fits the view to the graph; used by the auto fit path. */
   fitView(): void;
+  /** Optional hook invoked before rendering when the frame is dirty. */
+  beforeRender?: () => void;
 }
 
 export class RenderLoop {
@@ -148,6 +150,7 @@ export class RenderLoop {
       this.deps.atlas.revision !== this.lastAtlasRevision;
     this.forceDirty = false;
     if (dirty) {
+      this.deps.beforeRender?.();
       this.renderFrame();
     }
     const frameDuration = performance.now() - started;

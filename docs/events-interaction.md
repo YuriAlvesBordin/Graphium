@@ -458,6 +458,42 @@ graph.setInteraction({
 });
 ```
 
+## Camera Bounds (constrainToViewport)
+
+The `constrainToViewport` option keeps the camera inside the area occupied by the graph, so users cannot pan or zoom the content off screen.
+
+### Enabling the Constraint
+```ts
+const graph = Graphium.create({
+  container: document.getElementById('graph'),
+  constrainToViewport: true   // camera is confined to the graph bounds
+});
+```
+
+When enabled, the camera bounds are derived from the node positions (including their visual radius) and are kept up to date automatically:
+
+- Data operations (`addNode`, `addNodes`, `addLinks`, `setData`, `removeNode`, `clear`) recompute the bounds immediately.
+- Node movement — including physics simulation and dragging — recomputes the bounds on every rendered frame, so the clamp always reflects the current layout.
+- Hidden nodes are excluded from the bounds and do not restrict the camera.
+- Resizing the canvas re-applies the bounds.
+
+### Manual Bounds Control
+```ts
+// Set bounds explicitly (world coordinates); the camera clamps inside it
+graph.camera.setBounds(0, 0, 2000, 1000);
+
+// Remove the constraint and allow free panning
+graph.camera.clearBounds();
+
+// Inspect the current bounds (null when unconstrained)
+const bounds = graph.camera.getBounds(); // { minX, minY, maxX, maxY } | null
+```
+
+### Clamping Behavior
+- When the bounded content is **larger** than the viewport, panning is limited so no empty area is shown beyond the content edges, at any zoom level.
+- When the content **fits** the viewport, the clamp does nothing: the camera is free, because everything is already visible. Use `graph.fit()` or `graph.centerOn(x, y)` to center small content deliberately.
+- Zooming (wheel and pinch) is anchored to the pointer position and re-clamped, so zooming never breaks containment.
+
 ## Advanced Interaction Patterns
 
 ### Context Menus

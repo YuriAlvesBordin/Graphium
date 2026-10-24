@@ -12,14 +12,14 @@ describe('Camera bounds', () => {
     camera.setViewport(viewport.width, viewport.height);
     camera.setBounds(100, 100, 300, 300);
 
-    // Conteúdo cabe na tela: centraliza e trava.
-    expect(camera.x).toBe(200);
-    expect(camera.y).toBe(200);
+    // Conteúdo cabe na tela: o clamp é no-op — a câmera já mostra tudo.
+    expect(camera.x).toBe(0);
+    expect(camera.y).toBe(0);
 
-    // Tentar panar para longe não move a câmera.
+    // Panning fica livre, pois não há área vazia a esconder.
     camera.pan(1000, 1000);
-    expect(camera.x).toBe(200);
-    expect(camera.y).toBe(200);
+    expect(camera.x).toBe(1000);
+    expect(camera.y).toBe(1000);
   });
 
   it('should clamp panning to the content edges when content is larger than the view', () => {

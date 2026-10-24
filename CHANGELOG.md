@@ -2,6 +2,17 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.1.4] - 2026-10-24
+
+### Fixed
+- `Camera.zoomAt()` now re-clamps the camera position after re-anchoring, so wheel zoom and pinch gestures respect `constrainToViewport` bounds like every other camera mutator
+- Camera clamping no longer recenters the camera when the bounded content fits the viewport; the clamp is a no-op in that case, eliminating a feedback loop where dragging a node moved the bounds, which recentered the camera and made the scene slide under the pointer
+- `constrainToViewport` bounds are recalculated every rendered frame while nodes move (dragging or physics), so the clamp no longer acts against stale bounds
+- Hidden nodes are excluded from the computed graph bounds and no longer restrict the camera
+
+### Documentation
+- New "Camera Bounds (constrainToViewport)" section in the events & interaction guide covering the option, automatic bounds updates, manual `setBounds()`/`clearBounds()`/`getBounds()` control and the clamping behavior
+
 ## [2.1.2] - 2026-10-23
 
 ### Fixed

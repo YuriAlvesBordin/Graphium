@@ -9,7 +9,7 @@
 import { Emitter } from './core/events.js';
 import { FocusController } from './core/FocusController.js';
 import { GraphEditor } from './core/GraphEditor.js';
-import { GraphModel } from './core/GraphModel.js';
+import { GraphModel, NODE_HIDDEN } from './core/GraphModel.js';
 import { LinkHandle, NodeHandle } from './core/handles.js';
 import { SelectionController } from './core/SelectionController.js';
 import { resolveTheme } from './core/theme.js';
@@ -98,6 +98,7 @@ export class Graphium {
       isDestroyed: () => this.destroyed,
       autoFit: options.autoFit ?? false,
       fitView: () => this.fit(),
+      beforeRender: () => this.applyConstrainToViewport(),
     });
     this.editor = new GraphEditor({
       model: this.model,
@@ -390,6 +391,9 @@ export class Graphium {
     let maxY = -Infinity;
     let has = false;
     for (let index = 0; index < this.model.nodeCount; index++) {
+      if ((this.model.flags[index] & NODE_HIDDEN) !== 0) {
+        continue;
+      }
       const radius = this.model.visualRadius[index];
       minX = Math.min(minX, this.model.x[index] - radius);
       minY = Math.min(minY, this.model.y[index] - radius);

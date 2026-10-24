@@ -39,3 +39,4 @@ export type {
   StatsSnapshot,
   ThemeResolved,
 } from './core/types.js';
+export type { Bounds } from './render/Camera.js';
