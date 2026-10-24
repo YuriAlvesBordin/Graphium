@@ -174,6 +174,14 @@ describe('Renderer', () => {
     expect(gl.clearColor).toHaveBeenCalledWith(1, 0, 0, 1);
   });
 
+  it('should apply the constructor theme background to the clear color without a setTheme call', () => {
+    const gl = createFakeGL();
+    const renderer = new Renderer(createCanvas(gl), resolveTheme({ background: '#00ff00' }));
+    renderer.setCamera(new Camera());
+    renderer.render(makeModel());
+    expect(gl.clearColor).toHaveBeenCalledWith(0, 1, 0, 1);
+  });
+
   it('should draw straight edges, curved edges, arrows and nodes in one frame', () => {
     const gl = createFakeGL();
     const renderer = new Renderer(createCanvas(gl), DEFAULT_THEME, { fadeZoom: 0.1 });

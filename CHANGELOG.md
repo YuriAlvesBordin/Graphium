@@ -2,6 +2,11 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.1.2] - 2026-10-23
+
+### Fixed
+- The constructor now derives the WebGL clear color from the theme `background`, so a custom background passed at creation (`new Graphium(canvas, { theme: ... })`) takes effect immediately without requiring a `setTheme()` call; the rendered default background now matches the declared `#0b0e14` exactly
+
 ## [2.1.1] - 2026-10-23
 
 ### Fixed

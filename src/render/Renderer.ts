@@ -61,7 +61,7 @@ function link(gl: WebGL2RenderingContext, vertexSource: string, fragmentSource: 
 export class Renderer {
   readonly canvas: HTMLCanvasElement;
   gl: WebGL2RenderingContext | null;
-  theme: ThemeResolved;
+  theme!: ThemeResolved;
   atlas: TextureAtlas | null = null;
   lastRenderMs = 0;
   fadeZoom: number;
@@ -94,7 +94,7 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement, theme: ThemeResolved, options: RendererOptions = {}) {
     this.canvas = canvas;
-    this.theme = theme;
+    this.setTheme(theme);
     this.fadeZoom = options.fadeZoom ?? 0.18;
     this.maxPixelRatio = options.maxPixelRatio ?? 2;
     const attributes: WebGLContextAttributes = { antialias: options.antialias ?? true, alpha: true, premultipliedAlpha: true };
