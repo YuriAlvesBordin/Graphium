@@ -96,6 +96,32 @@ describe('constrainToViewport integration', () => {
     graph.destroy();
   });
 
+  it('should exclude hidden nodes from the constrained graph bounds', () => {
+    const graph = Graphium.create({
+      container: createHost(),
+      autoStart: false,
+      constrainToViewport: true,
+    });
+
+    graph.addNodes([
+      { id: 'visible', x: 0, y: 0, radius: 10 },
+      { id: 'ghost', x: 5000, y: 5000, radius: 10, hidden: true },
+    ]);
+
+    // Reaplica o confinamento (equivalente ao que o render loop faz a cada frame)
+    graph.resize();
+
+    // O nó oculto não participa dos bounds: confinam apenas os visíveis.
+    const bounds = graph.camera.getBounds();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.minX).toBeCloseTo(-10);
+    expect(bounds!.minY).toBeCloseTo(-10);
+    expect(bounds!.maxX).toBeCloseTo(10);
+    expect(bounds!.maxY).toBeCloseTo(10);
+
+    graph.destroy();
+  });
+
   it('should not confine when constrainToViewport is false', () => {
     const graph = Graphium.create({
       container: createHost(),
