@@ -30,6 +30,7 @@ export interface ResolvedPhysicsOptions {
   edgeSeparation: number;
   dragSmooth: number;
   throwFactor: number;
+  restLengthSmooth: number;
 }
 
 const DEFAULTS: ResolvedPhysicsOptions = {
@@ -52,6 +53,7 @@ const DEFAULTS: ResolvedPhysicsOptions = {
   edgeSeparation: 0.45,
   dragSmooth: 0.42,
   throwFactor: 1,
+  restLengthSmooth: 0.12,
 };
 
 export class PhysicsEngine {
@@ -76,6 +78,8 @@ export class PhysicsEngine {
   private dragIndex = -1;
   private dragTargetX = 0;
   private dragTargetY = 0;
+  private lastLengthRevision = -1;
+  private lengthsAnimating = false;
 
   constructor(model: GraphModel, options: PhysicsOptions = {}, sharedHash?: SpatialHash) {
     this.model = model;
@@ -130,6 +134,10 @@ export class PhysicsEngine {
       model.px[index] = model.x[index];
       model.py[index] = model.y[index];
     }
+    for (let link = 0; link < model.linkCount; link++) {
+      model.restLength[link] = model.restLengthTarget[link];
+    }
+    this.lengthsAnimating = false;
     this.temperature = this.options.temperature;
     this.iteration = 0;
     this.wake();
@@ -180,6 +188,13 @@ export class PhysicsEngine {
       this.lastTopology = model.topologyRevision;
       this.wake();
     }
+    if (this.lastLengthRevision !== model.restLengthRevision) {
+      this.lastLengthRevision = model.restLengthRevision;
+      this.lengthsAnimating = true;
+    }
+    if (this.lengthsAnimating) {
+      this.lengthsAnimating = this.easeRestLengths(delta);
+    }
     this.applyForces();
     this.integrate(delta);
     this.solveConstraints();
@@ -189,7 +204,7 @@ export class PhysicsEngine {
     model.positionRevision++;
     const energy = this.measureEnergy();
     this.energy = energy;
-    if (energy < this.options.sleepEnergy) {
+    if (energy < this.options.sleepEnergy && !this.lengthsAnimating) {
       this.sleepCounter++;
     } else {
       this.sleepCounter = 0;
@@ -285,6 +300,31 @@ export class PhysicsEngine {
         model.fy[b] -= ny;
       }
     }
+  }
+
+  /** Eases animated rest lengths toward their declared targets; returns true while any length is still moving. */
+  private easeRestLengths(dt: number): boolean {
+    const model = this.model;
+    const smooth = this.options.restLengthSmooth;
+    if (smooth <= 0) {
+      for (let link = 0; link < model.linkCount; link++) {
+        model.restLength[link] = model.restLengthTarget[link];
+      }
+      return false;
+    }
+    const factor = 1 - Math.pow(1 - Math.min(0.95, smooth), dt * 60);
+    let animating = false;
+    for (let link = 0; link < model.linkCount; link++) {
+      const target = model.restLengthTarget[link];
+      const diff = target - model.restLength[link];
+      if (Math.abs(diff) < 0.1) {
+        model.restLength[link] = target;
+        continue;
+      }
+      model.restLength[link] += diff * factor;
+      animating = true;
+    }
+    return animating;
   }
 
   /** Integrates velocities and positions, including the soft drag follower. */

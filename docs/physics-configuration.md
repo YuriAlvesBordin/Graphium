@@ -11,6 +11,7 @@ Graphium uses a force-directed physics simulator that combines several forces:
 - **Damping**: Reduces velocity over time to stabilize the system
 - **Collision**: Prevents node overlap
 - **Edge Separation**: Untangles overlapping edges
+- **Rest Length**: Per-link target distance the springs keep, with smooth animated transitions
 
 ## Physics Presets
 
@@ -78,7 +79,8 @@ graph.setPhysics({
   maxNeighbors: 128,
   edgeSeparation: 0.45,
   dragSmooth: 0.42,
-  throwFactor: 1
+  throwFactor: 1,
+  restLengthSmooth: 0.12
 });
 ```
 
@@ -120,6 +122,12 @@ graph.setPhysics({
 | `edgeSeparation` | 0.45 | 0-2 | Strength of the crossing untangler. 0 disables edge separation. |
 | `dragSmooth` | 0.42 | 0-1 | Drag follower elasticity per frame. Higher = more elastic dragging. |
 | `throwFactor` | 1 | 0.5-3 | Momentum multiplier applied on release when dragging nodes. |
+
+### Edge Length Parameters
+
+| Parameter | Default | Range | Description |
+|-----------|---------|-------|-------------|
+| `restLengthSmooth` | 0.12 | 0-0.95 | Fraction of the remaining length difference the solver closes per frame when a link's rest length changes. `0` snaps instantly, higher values glide more slowly. |
 
 ## Common Configuration Patterns
 
@@ -196,6 +204,29 @@ function improveLayout() {
   }, 2000);
 }
 ```
+
+## Edge Length Control
+
+Every link carries its own rest length: the distance the spring tries to keep
+between its endpoints. Links created without one use their spawn distance.
+
+```ts
+// Set at creation time
+graph.link('a', 'b', { restLength: 240 });
+
+// Change later through the fluent handle. The solver eases toward the new
+// target instead of jumping, even on a fully settled graph.
+graph.linkById('a~b~0').restLength(90);
+```
+
+The transition speed is controlled by `restLengthSmooth`. While any length is
+still easing, the engine stays awake; once every link reaches its target, the
+normal sleep detection resumes.
+
+Notes:
+- Changing a rest length (or a link strength) wakes the simulation automatically, so updates apply to settled graphs too.
+- `graph.reboot()` snaps all lengths to their declared targets instead of re-animating them.
+- Set `restLengthSmooth: 0` to restore the instant snapping behavior of earlier versions.
 
 ## Performance Considerations
 

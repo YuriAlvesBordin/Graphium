@@ -102,6 +102,20 @@ describe('GraphEditor', () => {
     expect(snapshot.curvature).toBeCloseTo(0.2);
   });
 
+  it('should wake the solver when a link appearance update touches physics', () => {
+    editor.addNode('a', {});
+    editor.addNode('b', {});
+    editor.link('a', 'b', {});
+    physics.sleeping = true;
+    editor.setLinkAppearance('a~b~0', { width: 3 });
+    expect(physics.sleeping).toBe(true);
+    editor.setLinkAppearance('a~b~0', { restLength: 120 });
+    expect(physics.sleeping).toBe(false);
+    physics.sleeping = true;
+    editor.setLinkAppearance('a~b~0', { strength: 2 });
+    expect(physics.sleeping).toBe(false);
+  });
+
   it('should set a node image', () => {
     editor.addNode('img', {});
     editor.setNodeImage('img', 'http://example.com/img.png', 'contain');

@@ -136,7 +136,7 @@ for (const field of ['model', 'physics', 'camera', 'renderer', 'atlas', 'labels'
 for (const name of ['style', 'move', 'fix', 'select', 'state', 'label', 'image', 'color', 'radius', 'data', 'remove']) {
   checkMethod('NodeHandle', graphium.NodeHandle.prototype, name);
 }
-for (const name of ['style', 'curve', 'dashed', 'color', 'select', 'data', 'remove']) {
+for (const name of ['style', 'curve', 'restLength', 'dashed', 'color', 'select', 'data', 'remove']) {
   checkMethod('LinkHandle', graphium.LinkHandle.prototype, name);
 }
 

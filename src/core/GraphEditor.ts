@@ -140,6 +140,9 @@ export class GraphEditor {
     const index = this.deps.model.linkIndexOf(id);
     if (index >= 0) {
       this.deps.model.updateLink(index, options);
+      if (options.restLength !== undefined || options.strength !== undefined) {
+        this.deps.physics.wake();
+      }
       this.deps.invalidate();
     }
   }

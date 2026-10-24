@@ -225,6 +225,7 @@
         <div class="slider-row"><label>Damping <b id="valDamping"></b></label><input type="range" id="sldDamping" min="0.7" max="0.985" step="0.005"></div>
         <div class="slider-row"><label>Gravity <b id="valGravity"></b></label><input type="range" id="sldGravity" min="0" max="0.012" step="0.0005"></div>
         <div class="slider-row"><label>Edge curvature <b id="valCurvature"></b></label><input type="range" id="sldCurvature" min="-0.8" max="0.8" step="0.05"></div>
+        <div class="slider-row"><label>Edge rest length <b id="valRestLength"></b></label><input type="range" id="sldRestLength" min="40" max="400" step="5"></div>
       </div>
 
       <div class="section">
@@ -407,6 +408,7 @@
       count: 120,
       images: true,
       curvature: 0,
+      restLength: null,
       preset: "silk",
     };
 
@@ -417,6 +419,9 @@
       graph.setData(data);
       applyImages();
       applyCurvature(state.curvature);
+      if (state.restLength !== null) {
+        applyRestLength(state.restLength);
+      }
       graph.setPhysics({ edgeSeparation: name === "tree" ? 0 : 0.45 });
       graph.fit(70);
       updateDatasetChips();
@@ -440,6 +445,13 @@
         model.linkCurvature[index] = value;
       }
       graph.requestRender();
+    }
+
+    function applyRestLength(value) {
+      state.restLength = value;
+      for (const id of graph.linkIds()) {
+        graph.link(id).restLength(value);
+      }
     }
 
     const presetRow = document.getElementById("presetRow");
@@ -525,6 +537,7 @@
     const dampingControl = bindSlider("sldDamping", "valDamping", v => v.toFixed(3), v => graph.setPhysics({ damping: v }));
     const gravityControl = bindSlider("sldGravity", "valGravity", v => v.toFixed(4), v => graph.setPhysics({ gravity: v }));
     const curvatureControl = bindSlider("sldCurvature", "valCurvature", v => v.toFixed(2), applyCurvature);
+    const restLengthControl = bindSlider("sldRestLength", "valRestLength", v => String(v), applyRestLength);
     const countControl = bindSlider("sldCount", "valCount", v => String(v), v => {
       state.count = v;
     });
@@ -542,6 +555,7 @@
       gravityControl.value.textContent = physics.gravity.toFixed(4);
       curvatureControl.slider.value = state.curvature;
       curvatureControl.value.textContent = state.curvature.toFixed(2);
+      restLengthControl.value.textContent = state.restLength === null ? "auto" : String(state.restLength);
       countControl.slider.value = state.count;
       countControl.value.textContent = state.count;
     }

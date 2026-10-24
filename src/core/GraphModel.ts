@@ -91,6 +91,7 @@ export class GraphModel {
   topologyRevision = 0;
   positionRevision = 0;
   appearanceRevision = 0;
+  restLengthRevision = 0;
   palette: number[];
 
   private nodeIds: Array<NodeId | undefined> = [];
@@ -125,6 +126,7 @@ export class GraphModel {
   source: Int32Array;
   target: Int32Array;
   restLength: Float32Array;
+  restLengthTarget: Float32Array;
   linkStrength: Float32Array;
   linkWidth: Float32Array;
   linkColor: Uint32Array;
@@ -190,6 +192,7 @@ export class GraphModel {
     this.source = new Int32Array(this.linkCapacity);
     this.target = new Int32Array(this.linkCapacity);
     this.restLength = new Float32Array(this.linkCapacity);
+    this.restLengthTarget = new Float32Array(this.linkCapacity);
     this.linkStrength = new Float32Array(this.linkCapacity);
     this.linkWidth = new Float32Array(this.linkCapacity);
     this.linkColor = new Uint32Array(this.linkCapacity);
@@ -289,7 +292,9 @@ export class GraphModel {
     this.target[index] = target;
     const dx = this.x[target] - this.x[source];
     const dy = this.y[target] - this.y[source];
-    this.restLength[index] = Math.max(1, Math.hypot(dx, dy) || 90);
+    const distance = Math.max(1, Math.hypot(dx, dy) || 90);
+    this.restLength[index] = distance;
+    this.restLengthTarget[index] = distance;
     this.linkStrength[index] = 1;
     this.linkFlags[index] = options.hidden ? LINK_HIDDEN : 0;
     this.arrowMode[index] = 0;
@@ -373,8 +378,9 @@ export class GraphModel {
   /** Applies link level appearance and physics properties to an index. */
   private applyLinkOptions(index: number, options: LinkOptions, isNew: boolean): void {
     const defaults = this.linkDefaults;
-    if (isNew || options.restLength !== undefined) {
-      this.restLength[index] = Math.max(1, finiteOr(options.restLength, this.restLength[index]));
+    if (options.restLength !== undefined) {
+      this.restLengthTarget[index] = Math.max(1, finiteOr(options.restLength, this.restLengthTarget[index]));
+      this.restLengthRevision++;
     }
     if (isNew || options.strength !== undefined) {
       this.linkStrength[index] = Math.max(0.0001, finiteOr(options.strength, 1));
@@ -539,6 +545,7 @@ export class GraphModel {
       this.source[index] = this.source[last];
       this.target[index] = this.target[last];
       this.restLength[index] = this.restLength[last];
+      this.restLengthTarget[index] = this.restLengthTarget[last];
       this.linkStrength[index] = this.linkStrength[last];
       this.linkWidth[index] = this.linkWidth[last];
       this.linkColor[index] = this.linkColor[last];
@@ -701,7 +708,7 @@ export class GraphModel {
       arrowSize: this.arrowSize[index],
       arrowWidth: this.arrowWidth[index],
       strength: this.linkStrength[index],
-      restLength: this.restLength[index],
+      restLength: this.restLengthTarget[index],
       hidden: (this.linkFlags[index] & LINK_HIDDEN) !== 0,
       data: this.linkData[index] ?? {},
     };
@@ -762,6 +769,7 @@ export class GraphModel {
     this.source = growInt(this.source, capacity);
     this.target = growInt(this.target, capacity);
     this.restLength = grow(this.restLength, capacity);
+    this.restLengthTarget = grow(this.restLengthTarget, capacity);
     this.linkStrength = grow(this.linkStrength, capacity);
     this.linkWidth = grow(this.linkWidth, capacity);
     this.linkColor = growUint32(this.linkColor, capacity);

@@ -1,0 +1,45 @@
+# Changelog
+
+All notable changes to Graphium will be documented in this file.
+
+## [2.1.0] - 2026-10-23
+
+### Added
+- Smooth edge length animation: per-link `restLength` changes now ease through the physics solver instead of jumping, driven by the new `restLengthSmooth` physics option (default `0.12`, `0` restores instant snapping)
+- `LinkHandle.restLength(value)` fluent shortcut for changing one edge's rest length
+- Changing a link's `restLength` or `strength` now wakes the simulation, so length updates apply even on a fully settled graph
+- "Edge rest length" slider in the playground demo
+
+## [Unreleased]
+
+### Added
+- Fluent interface consistency: setter methods now return `this` for chaining
+- Bulk operations: `addNodes()`, `addLinks()`, `removeNodes()`, `removeLinks()`
+- Explicit add semantics: `addNodeIfAbsent()`, `addLinkIfAbsent()`
+- Enhanced event payloads: events now include node/link snapshots and IDs
+- Advanced label styling: customizable font, color, background, padding, alignment, multi-line
+- Export capabilities: `exportImage()` (PNG/JPEG) and `exportJSON()` methods
+- Theme system: built-in themes and custom theme support via `setTheme()`
+- Auto-destroy option: automatic cleanup for SPA environments
+- Comprehensive examples showcasing new features
+
+### Changed
+- Updated default appearance options to include label styling properties
+- Improved label management system to support HTML content and styling
+- Updated README with detailed feature documentation and import alternatives
+- Minor performance optimizations in appearance change handling
+
+### Fixed
+- Fixed default export consistency issues with different module systems
+- Corrected label positioning calculations for various styling options
+- Ensured proper cleanup of MutationObserver in auto-destroy feature
+
+## [0.1.0] - 2026-09-03
+### Added
+- Initial release of Graphium with core features:
+  - WebGL2-based high-performance rendering
+  - Physics-based force-directed layout
+  - Edge conflict detection and resolution
+  - Rich interaction capabilities
+  - Zero-dependency ES module distribution
+  - TypeScript definitions

@@ -32,6 +32,7 @@ describe('PhysicsEngine', () => {
     expect(engine.options.sleepFrames).toBe(48);
     expect(engine.options.dragSmooth).toBe(0.42);
     expect(engine.options.throwFactor).toBe(1);
+    expect(engine.options.restLengthSmooth).toBe(0.12);
   });
 
   it('should apply preset values and keep explicit overrides on top', () => {
@@ -133,6 +134,84 @@ describe('PhysicsEngine', () => {
     const distance = Math.hypot(model.x[1] - model.x[0], model.y[1] - model.y[0]);
     expect(distance).toBeLessThan(200);
     expect(distance).toBeGreaterThan(20);
+  });
+
+  it('should ease animated rest lengths toward their declared targets', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0, fixed: true });
+    model.addNode('b', { x: 300, y: 0 });
+    model.addLink('e', 'a', 'b', { restLength: 60 });
+    const engine = makeEngine(model, { restLengthSmooth: 0.1 });
+    // The animation starts from the spawn distance, not from the target.
+    expect(model.restLength[0]).toBeCloseTo(300);
+    engine.step(1 / 60);
+    expect(model.restLength[0]).toBeLessThan(300);
+    expect(model.restLength[0]).toBeGreaterThan(60);
+    for (let i = 0; i < 400; i++) {
+      engine.step(1 / 60);
+    }
+    expect(model.restLength[0]).toBe(60);
+    const distance = Math.hypot(model.x[1] - model.x[0], model.y[1] - model.y[0]);
+    expect(Math.abs(distance - 60)).toBeLessThan(2);
+  });
+
+  it('should ease rest lengths at a frame rate independent rate', () => {
+    const build = () => {
+      const model = makeModel();
+      model.addNode('a', { x: 0, y: 0 });
+      model.addNode('b', { x: 200, y: 0 });
+      model.addLink('e', 'a', 'b', { restLength: 100 });
+      return { model, engine: makeEngine(model, { restLengthSmooth: 0.1 }) };
+    };
+    const slow = build();
+    const fast = build();
+    for (let i = 0; i < 60; i++) {
+      slow.engine.step(1 / 60);
+    }
+    for (let i = 0; i < 30; i++) {
+      fast.engine.step(1 / 30);
+    }
+    expect(fast.model.restLength[0]).toBeCloseTo(slow.model.restLength[0], 2);
+  });
+
+  it('should snap rest lengths immediately when smoothing is disabled', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 200, y: 0 });
+    model.addLink('e', 'a', 'b', { restLength: 100 });
+    const engine = makeEngine(model, { restLengthSmooth: 0 });
+    expect(model.restLength[0]).toBeCloseTo(200);
+    engine.step(1 / 60);
+    expect(model.restLength[0]).toBe(100);
+  });
+
+  it('should keep the solver awake while a rest length animation is in flight', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0, fixed: true });
+    model.addNode('b', { x: 300, y: 0 });
+    model.addLink('e', 'a', 'b', { restLength: 60 });
+    const engine = makeEngine(model, { restLengthSmooth: 0.02, sleepEnergy: 0.001, sleepFrames: 3 });
+    for (let i = 0; i < 30; i++) {
+      engine.step(1 / 60);
+    }
+    expect(engine.sleeping).toBe(false);
+    for (let i = 0; i < 600; i++) {
+      engine.step(1 / 60);
+    }
+    expect(engine.sleeping).toBe(true);
+    expect(model.restLength[0]).toBe(60);
+  });
+
+  it('should snap rest lengths on reset so reboot does not re-animate', () => {
+    const model = makeModel();
+    model.addNode('a', { x: 0, y: 0 });
+    model.addNode('b', { x: 200, y: 0 });
+    model.addLink('e', 'a', 'b', { restLength: 100 });
+    const engine = makeEngine(model, { restLengthSmooth: 0.05 });
+    engine.step(1 / 60);
+    expect(model.restLength[0]).not.toBe(100);
+    engine.reset();
+    expect(model.restLength[0]).toBe(100);
   });
 
   it('should pull free nodes toward the origin through gravity', () => {

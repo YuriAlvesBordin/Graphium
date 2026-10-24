@@ -158,6 +158,21 @@ describe('GraphModel', () => {
       expect(model.dashWorldScale[0]).toBe(1);
     });
 
+    it('should treat the declared rest length as an animation target', () => {
+      const model = makeModel();
+      model.addNode('a', { x: 0, y: 0 });
+      model.addNode('b', { x: 30, y: 40 });
+      model.addLink('e', 'a', 'b', { restLength: 120 });
+      // The effective length starts at the spawn distance; the target is declared.
+      expect(model.restLength[0]).toBeCloseTo(50);
+      expect(model.restLengthTarget[0]).toBe(120);
+      expect(model.restLengthRevision).toBeGreaterThan(0);
+      model.updateLink(0, { restLength: 80 });
+      expect(model.restLength[0]).toBeCloseTo(50);
+      expect(model.restLengthTarget[0]).toBe(80);
+      expect(model.linkSnapshot(0).restLength).toBe(80);
+    });
+
     it('should fall back to the default dash pattern for dashed links', () => {
       const model = makeModel();
       model.addNode('a', { x: 0, y: 0 });
@@ -347,14 +362,16 @@ describe('GraphModel', () => {
       for (const id of ['a', 'b', 'c', 'd']) {
         model.addNode(id, { x: 0, y: 0 });
       }
-      model.addLink('e0', 'a', 'b', { width: 1 });
+      model.addLink('e0', 'a', 'b', { width: 1, restLength: 90 });
       model.addLink('e1', 'b', 'c', { width: 2, curvature: 0.5 });
-      model.addLink('e2', 'c', 'd', { width: 3 });
+      model.addLink('e2', 'c', 'd', { width: 3, restLength: 140 });
       expect(model.removeLink('e0')).toBe(true);
       expect(model.linkCount).toBe(2);
       // e2 was moved into slot 0.
       expect(model.linkIdAt(0)).toBe('e2');
       expect(model.linkWidth[0]).toBe(3);
+      expect(model.restLengthTarget[0]).toBe(140);
+      expect(model.restLength[0]).toBe(90);
       expect(model.linkIndexById.get('e2')).toBe(0);
       // e1 stayed in slot 1 with its own properties.
       expect(model.linkIdAt(1)).toBe('e1');
@@ -538,12 +555,13 @@ describe('GraphModel', () => {
       model.addNode('hub', { x: 0, y: 0 });
       for (let i = 0; i < 20; i++) {
         model.addNode(`n${i}`, { x: i, y: 0 });
-        model.addLink(`e${i}`, 'hub', `n${i}`, { curvature: 0.1 * (i % 3) });
+        model.addLink(`e${i}`, 'hub', `n${i}`, { curvature: 0.1 * (i % 3), restLength: 60 + i });
       }
       expect(model.linkCount).toBe(20);
       expect(model.source.length).toBeGreaterThanOrEqual(20);
       expect(model.linkIndexOf('e19')).toBe(19);
       expect(model.linkCurvature[19]).toBeCloseTo(0.1);
+      expect(model.restLengthTarget[19]).toBe(79);
       expect(model.linkSnapshot(19).id).toBe('e19');
       model.removeLink('e0');
       // e19 moved into the freed slot 0.

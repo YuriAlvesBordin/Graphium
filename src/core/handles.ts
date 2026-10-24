@@ -104,6 +104,12 @@ export class LinkHandle {
     return this;
   }
 
+  /** Sets the rest length of the edge; the solver eases toward the new target. */
+  restLength(value: number): this {
+    this.graph.editor.setLinkAppearance(this.id, { restLength: value });
+    return this;
+  }
+
   /** Switches the edge to a dashed style with an optional pattern. */
   dashed(pattern?: [number, number]): this {
     this.graph.editor.setLinkAppearance(this.id, { style: 'dashed', dashPattern: pattern });

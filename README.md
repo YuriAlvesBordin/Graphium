@@ -57,6 +57,17 @@ no extra CPU. Positive values curve one way, negative values the other.
 
 ![Curved edges](docs/assets/curved-edges.gif)
 
+### Smooth edge length control
+
+Every link carries its own rest length, and the solver eases toward new values
+instead of jumping. Changing a length wakes the graph up automatically, so even
+a fully settled layout reorganizes itself gracefully.
+
+```ts
+graph.link('alice', 'bob', { restLength: 240 });
+graph.linkById('alice~bob~0').restLength(90);
+```
+
 ### Built-in themes
 
 The four bundled themes (midnight, light, slate, sunset) switching at runtime.

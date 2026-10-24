@@ -98,6 +98,7 @@ describe('Node and Link handles', () => {
     const result = handle
       .style({ width: 5 })
       .curve(0.4)
+      .restLength(180)
       .dashed([3, 5])
       .color('#00ff00')
       .data({ weight: 2 });
@@ -105,6 +106,7 @@ describe('Node and Link handles', () => {
     const snap = handle.snapshot;
     expect(snap?.width).toBe(5);
     expect(snap?.curvature).toBeCloseTo(0.4);
+    expect(snap?.restLength).toBe(180);
     expect(snap?.style).toBe('dashed');
     expect(snap?.dashPattern).toEqual([3, 5]);
     expect(snap?.data).toEqual({ weight: 2 });

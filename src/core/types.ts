@@ -75,6 +75,7 @@ export interface PhysicsOptions {
   edgeSeparation?: number;
   dragSmooth?: number;
   throwFactor?: number;
+  restLengthSmooth?: number;
 }
 
 export type PhysicsPresetName = 'silk' | 'bouncy' | 'crystal' | 'liquid';
