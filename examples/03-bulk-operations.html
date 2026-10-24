@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>03 · Bulk Operations — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>03 · Bulk Operations</h1>
+    <p>Efficiently adding and removing many nodes and links with <code>addNodes</code>, <code>addLinks</code>, <code>setData</code>, <code>removeNode</code> and <code>removeLink</code>.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <span class="counts"><b id="countNodes">0</b> nodes · <b id="countLinks">0</b> links</span>
+      <span class="spacer"></span>
+      <button id="btnAdd">+ 80 nodes</button>
+      <button id="btnPrune">Prune leaves</button>
+      <button id="btnReplace">setData (tree)</button>
+      <button id="btnClear" class="primary">Clear</button>
+    </div>
+    <p class="hint">
+      <code>addNodes</code>/<code>addLinks</code> write straight into the packed model without per-call events.
+      <code>setData</code> swaps the whole graph in one call, and <code>removeNode</code> also drops its links.
+    </p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "midnight" },
+    });
+
+    let nextId = 0;
+
+    function addBatch(size) {
+      const anchors = graph.nodeIds();
+      const nodes = [];
+      const links = [];
+      for (let i = 0; i < size; i++) {
+        const id = `n${nextId++}`;
+        nodes.push({ id, label: id });
+        // Link to an older node from this batch or to a pre-existing one.
+        const pool = anchors.concat(nodes.map((n) => n.id));
+        const anchor = pool[Math.floor(Math.random() * pool.length)];
+        if (anchor !== id) {
+          links.push({ source: id, target: anchor });
+        }
+      }
+      graph.addNodes(nodes).addLinks(links).fit(70);
+    }
+
+    document.getElementById("btnAdd").addEventListener("click", () => addBatch(80));
+
+    document.getElementById("btnPrune").addEventListener("click", () => {
+      for (const id of graph.nodeIds()) {
+        const snapshot = graph.getNode(id);
+        if (snapshot && snapshot.degree <= 1) {
+          graph.removeNode(id);
+        }
+      }
+      graph.fit(70);
+    });
+
+    document.getElementById("btnReplace").addEventListener("click", () => {
+      nextId = 0;
+      const nodes = [];
+      const links = [];
+      let counter = 0;
+      const walk = (level, parentId, x, y) => {
+        const id = `t${counter++}`;
+        nodes.push({ id, label: `L${level}`, x, y });
+        if (parentId !== null) links.push({ source: parentId, target: id });
+        if (level < 5) {
+          walk(level + 1, id, x - 160 / (level + 1), y + 95);
+          walk(level + 1, id, x + 160 / (level + 1), y + 95);
+        }
+      };
+      walk(0, null, 0, -200);
+      graph.setData({ nodes, links }).fit(70);
+    });
+
+    document.getElementById("btnClear").addEventListener("click", () => {
+      nextId = 0;
+      graph.clear();
+    });
+
+    addBatch(60);
+
+    const countNodes = document.getElementById("countNodes");
+    const countLinks = document.getElementById("countLinks");
+    setInterval(() => {
+      countNodes.textContent = String(graph.nodeCount);
+      countLinks.textContent = String(graph.linkCount);
+    }, 300);
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

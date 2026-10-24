@@ -1,11 +1,19 @@
-# Graphium
+<p align="center">
+  <img src="docs/assets/logo.png" width="200" alt="Graphium logo" />
+</p>
 
-[![npm version](https://img.shields.io/npm/v/@yurialvesbordin/graphium.svg)](https://www.npmjs.com/package/@yurialvesbordin/graphium)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-0074c1.svg)](http://www.typescriptlang.org/)
-[![WebGL2](https://img.shields.io/badge/WebGL2-enabled-ff69b4.svg)](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API)
+<h1 align="center">Graphium</h1>
 
-High-performance WebGL2 graph visualization with silk-smooth force physics, curved edges, node images, and a fluent API.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@yurialvesbordin/graphium"><img src="https://img.shields.io/npm/v/@yurialvesbordin/graphium.svg" alt="npm version" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <a href="http://www.typescriptlang.org/"><img src="https://img.shields.io/badge/built%20with-TypeScript-0074c1.svg" alt="TypeScript" /></a>
+  <a href="https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API"><img src="https://img.shields.io/badge/WebGL2-enabled-ff69b4.svg" alt="WebGL2" /></a>
+</p>
+
+<p align="center">
+  High-performance WebGL2 graph visualization with silk-smooth force physics, curved edges, node images, and a fluent API.
+</p>
 
 ![Graphium hero](docs/assets/hero.png)
 

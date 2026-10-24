@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>10 · Lifecycle &amp; Destroy (SPA) — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>10 · Lifecycle &amp; Destroy (SPA)</h1>
+    <p>Cleanup to prevent memory leaks in single-page applications. Call <code>destroy()</code> when the view unmounts: it disconnects the ResizeObserver, stops the run loop, frees the WebGL resources and clears every listener.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <span class="counts" id="status">state: <b>mounted</b> · <b id="countNodes">0</b> nodes</span>
+      <span class="spacer"></span>
+      <button id="btnMount" disabled>Mount view</button>
+      <button id="btnUnmount" class="primary">Unmount &amp; destroy</button>
+    </div>
+    <div class="log" id="log"></div>
+    <p class="hint">Simulates a SPA route: mount creates the instance and subscribes to events; unmount calls <code>destroy()</code> and drops the canvas. Listeners registered through <code>graph.on()</code> die with the instance — nothing leaks between mounts.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const stage = document.getElementById("stage");
+    const statusEl = document.getElementById("status");
+    const countNodes = document.getElementById("countNodes");
+    const logEl = document.getElementById("log");
+    const btnMount = document.getElementById("btnMount");
+    const btnUnmount = document.getElementById("btnUnmount");
+
+    let graph = null;
+
+    function log(message, cls) {
+      const line = document.createElement("div");
+      const time = new Date().toLocaleTimeString([], { hour12: false });
+      line.innerHTML = `<span class="t">${time}</span> ${cls ? `<span class="${cls}">${message}</span>` : message}`;
+      logEl.prepend(line);
+    }
+
+    function mount() {
+      graph = Graphium.create({
+        container: stage,
+        autoStart: true,
+        autoFit: true,
+        physics: { preset: "silk" },
+        theme: { name: "midnight" },
+      });
+      graph.setData({
+        nodes: Array.from({ length: 16 }, (_, i) => ({ id: `n${i}`, label: `N${i}` })),
+        links: Array.from({ length: 22 }, (_, i) => ({
+          source: `n${i % 16}`,
+          target: `n${(i * 5 + 3) % 16}`,
+        })).filter((l) => l.source !== l.target),
+      });
+      graph.fit(80);
+
+      const unsubscribe = graph.on("click", (event) => {
+        if (event.nodeId !== undefined) log(`click on '${event.nodeId}' (listener still alive)`, "ok");
+      });
+      window.__unsubscribe = unsubscribe;
+
+      btnMount.disabled = true;
+      btnUnmount.disabled = false;
+      statusEl.innerHTML = 'state: <b style="color:#34d399">mounted</b> · <b id="countNodes">0</b> nodes';
+      log("mounted: instance created, events subscribed, run loop started", "ok");
+    }
+
+    function unmount() {
+      if (!graph) return;
+      window.__unsubscribe?.();
+      graph.destroy();
+      graph = null;
+      stage.innerHTML = ""; // the canvas belongs to the unmounted view
+      btnMount.disabled = false;
+      btnUnmount.disabled = true;
+      statusEl.innerHTML = 'state: <b style="color:#fbbf24">destroyed</b> · 0 nodes';
+      log("unmounted: destroy() called — observer, loop, WebGL context and listeners released", "skip");
+    }
+
+    btnMount.addEventListener("click", mount);
+    btnUnmount.addEventListener("click", unmount);
+
+    mount();
+    setInterval(() => {
+      const el = document.getElementById("countNodes");
+      if (el && graph) el.textContent = String(graph.nodeCount);
+    }, 300);
+
+    window.__ready = true;
+  </script>
+</body>
+</html>

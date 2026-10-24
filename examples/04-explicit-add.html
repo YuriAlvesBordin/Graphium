@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>04 · Guarded Add — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>04 · Guarded Add (IfAbsent)</h1>
+    <p>Preventing accidental overwrites. Graphium has no built-in <code>addNodeIfAbsent</code>; this page builds the guard on top of <code>getNode</code>/<code>getLink</code>, since <code>addNode</code> replaces an existing id and <code>link(source, target)</code> reuses the auto id.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <button id="btnSeed">Seed graph</button>
+      <button id="btnGuarded">Guarded add (skips existing)</button>
+      <button id="btnBlind">Blind add (overwrites)</button>
+    </div>
+    <div class="log" id="log"></div>
+    <p class="hint">Watch the log: guarded calls report <b>skipped</b> for known ids, blind calls silently replace them — note how the overwritten node keeps its old position but loses its custom radius and label.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "crystal" },
+      theme: { name: "midnight" },
+    });
+
+    const logEl = document.getElementById("log");
+    function log(message, cls) {
+      const line = document.createElement("div");
+      const time = new Date().toLocaleTimeString([], { hour12: false });
+      line.innerHTML = `<span class="t">${time}</span> ${cls ? `<span class="${cls}">${message}</span>` : message}`;
+      logEl.prepend(line);
+      while (logEl.childElementCount > 60) logEl.lastChild.remove();
+    }
+
+    // Guard helpers: only write when the id is not present yet.
+    function addNodeIfAbsent(id, options) {
+      if (graph.getNode(id) !== null) {
+        log(`addNodeIfAbsent: node '${id}' already exists — skipped`, "skip");
+        return false;
+      }
+      graph.addNode(id, options);
+      log(`addNodeIfAbsent: added node '${id}'`, "ok");
+      return true;
+    }
+
+    function addLinkIfAbsent(source, target, options) {
+      const autoId = `${source}~${target}~0`;
+      if (graph.getLink(autoId) !== null) {
+        log(`addLinkIfAbsent: link '${autoId}' already exists — skipped`, "skip");
+        return false;
+      }
+      graph.link(source, target, options);
+      log(`addLinkIfAbsent: added link '${source}' → '${target}'`, "ok");
+      return true;
+    }
+
+    function seed() {
+      graph.clear();
+      graph
+        .addNode("core", { label: "Core", radius: 20, color: "#4f8ef7", x: 0, y: 0 })
+        .addNode("a", { label: "A", radius: 14, color: "#ff6b6b", x: 180, y: -60 })
+        .addNode("b", { label: "B", radius: 14, color: "#4ecdc4", x: -160, y: 90 })
+        .link("core", "a")
+        .link("core", "b")
+        .fit(90);
+      log("seeded core / a / b");
+    }
+
+    document.getElementById("btnSeed").addEventListener("click", seed);
+
+    document.getElementById("btnGuarded").addEventListener("click", () => {
+      addNodeIfAbsent("a", { label: "A (new)", radius: 6, color: "#ffe66d" });
+      addNodeIfAbsent("c", { label: "C", radius: 14, color: "#aa96da" });
+      addLinkIfAbsent("core", "a");
+      addLinkIfAbsent("a", "c");
+      graph.fit(90);
+    });
+
+    document.getElementById("btnBlind").addEventListener("click", () => {
+      graph.addNode("a", { label: "A (replaced)", radius: 6, color: "#ffe66d" });
+      log("blind addNode('a'): replaced — radius 14 → 6, label lost position styling", "skip");
+      graph.fit(90);
+    });
+
+    seed();
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>11 · Themes — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>11 · Themes</h1>
+    <p>Applying theme objects for consistent styling. Four themes ship built in — <code>midnight</code>, <code>light</code>, <code>slate</code>, <code>sunset</code> — and <code>setTheme</code> merges any partial object over the current one, so a custom theme only needs the keys it changes.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls" id="themeRow">
+      <span class="counts">theme:</span>
+    </div>
+    <div class="controls">
+      <button id="btnCustom" class="primary">Apply custom merge</button>
+      <button id="btnArrows">Toggle arrows</button>
+    </div>
+    <p class="hint">The custom merge starts from <code>sunset</code> and overrides background, node palette, edge color and the label pill in one call — the underlying built-in stays untouched.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium, BUILT_IN_THEMES } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "midnight" },
+    });
+
+    const palette = ["#ff6b6b", "#4ecdc4", "#ffe66d", "#95e1d3", "#aa96da", "#fcbad3"];
+    graph.setData({
+      nodes: Array.from({ length: 20 }, (_, i) => ({
+        id: `n${i}`,
+        label: `N${i}`,
+        color: palette[i % palette.length],
+      })),
+      links: Array.from({ length: 28 }, (_, i) => ({
+        source: `n${i % 20}`,
+        target: `n${(i * 3 + 5) % 20}`,
+      })).filter((l) => l.source !== l.target),
+    });
+    graph.fit(70);
+
+    const themeRow = document.getElementById("themeRow");
+    let current = "midnight";
+    for (const name of Object.keys(BUILT_IN_THEMES)) {
+      const chip = document.createElement("button");
+      chip.className = "chip" + (name === current ? " active" : "");
+      chip.textContent = name;
+      chip.addEventListener("click", () => {
+        current = name;
+        graph.setTheme({ name });
+        for (const other of themeRow.querySelectorAll(".chip")) {
+          other.classList.toggle("active", other === chip);
+        }
+      });
+      themeRow.appendChild(chip);
+    }
+
+    document.getElementById("btnCustom").addEventListener("click", () => {
+      current = "custom";
+      for (const other of themeRow.querySelectorAll(".chip")) other.classList.remove("active");
+      graph.setTheme({
+        name: "sunset",
+        background: "#101820",
+        node: { colorPalette: ["#f5f7fa", "#9fb3c8", "#5d7a99"], radius: 14, borderWidth: 2 },
+        edge: { color: "#3d5a80", width: 1.4 },
+        label: { color: "#dbe7f3", background: "rgba(16, 24, 32, 0.85)", padding: [3, 7], radius: 5 },
+      });
+    });
+
+    let arrows = false;
+    document.getElementById("btnArrows").addEventListener("click", () => {
+      arrows = !arrows;
+      graph.setTheme({ edge: { arrowEnabled: arrows } });
+    });
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

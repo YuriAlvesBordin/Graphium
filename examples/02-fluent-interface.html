@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>02 · Fluent Interface — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>02 · Fluent Interface</h1>
+    <p>Method chaining for concise code. Graph methods return the graph, and per-node / per-link handles returned by <code>node(id)</code> and <code>link(id)</code> chain their own style calls.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <button id="btnStyleHandles">Restyle via handles</button>
+      <button id="btnReset" class="primary">Reset</button>
+    </div>
+    <p class="hint">
+      <code>addNode</code>, <code>link</code>, <code>setTheme</code>, <code>setPhysics</code>… all return <code>this</code>, so setup reads as one sentence.
+      <code>node('id')</code> and <code>link('id')</code> return handles whose methods (<code>color</code>, <code>radius</code>, <code>label</code>, <code>fix</code>, <code>curve</code>, <code>dashed</code>…) chain too.
+    </p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "midnight" },
+    });
+
+    function build() {
+      graph.clear();
+      // One chained sentence: nodes, links, camera.
+      graph
+        .addNode("core", { label: "Core", radius: 20, color: "#4f8ef7" })
+        .addNode("a", { label: "Gateway" })
+        .addNode("b", { label: "Cache" })
+        .addNode("c", { label: "Worker" })
+        .addNode("d", { label: "Queue" })
+        .link("core", "a", { width: 2.5 })
+        .link("core", "b")
+        .link("a", "c", { curvature: 0.25 })
+        .link("b", "c")
+        .link("c", "d", { style: "dashed", dashPattern: [8, 6] })
+        .fit(90);
+
+      // Handles chain per object: restyle three nodes in three sentences.
+      graph
+        .node("a").color("#ff6b6b").radius(14).label("Gateway ★");
+      graph
+        .node("b").color("#4ecdc4").radius(12);
+      graph
+        .node("d").color("#ffe66d").fix(false);
+    }
+
+    document.getElementById("btnStyleHandles").addEventListener("click", () => {
+      // link(source, target) returns the graph; linkById/auto id returns the handle.
+      graph.linkById("core~a~0").curve(0.4);
+      graph.node("core").label("Core (hub)").radius(26);
+      graph.node("c").state("hover");
+    });
+
+    document.getElementById("btnReset").addEventListener("click", build);
+
+    build();
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

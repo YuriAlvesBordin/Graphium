@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>07 · Export Image (PNG) — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>07 · Export Image (PNG)</h1>
+    <p>Exporting the current view as a PNG image. <code>screenshot()</code> renders one frame on demand and returns a PNG data URL straight from the WebGL canvas — safe to call even while the simulation sleeps.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <button id="btnShoot" class="primary">Capture PNG</button>
+      <a id="download" download="graphium-graph.png" style="display:none">Download capture</a>
+    </div>
+    <div class="preview" id="preview" style="display:none">
+      <img id="shot" alt="Captured graph">
+      <p class="hint" id="meta"></p>
+    </div>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "sunset" },
+    });
+
+    const palette = ["#ff6b6b", "#4ecdc4", "#ffe66d", "#95e1d3", "#aa96da", "#fcbad3"];
+    graph.setData({
+      nodes: Array.from({ length: 30 }, (_, i) => ({
+        id: `n${i}`,
+        label: `N${i}`,
+        color: palette[i % palette.length],
+      })),
+      links: Array.from({ length: 42 }, (_, i) => ({
+        source: `n${i % 30}`,
+        target: `n${(i * 5 + 7) % 30}`,
+      })).filter((l) => l.source !== l.target),
+    });
+    graph.fit(70);
+
+    document.getElementById("btnShoot").addEventListener("click", () => {
+      const dataUrl = graph.screenshot();
+      const shot = document.getElementById("shot");
+      shot.src = dataUrl;
+      document.getElementById("preview").style.display = "flex";
+      const bytes = Math.round((dataUrl.length - "data:image/png;base64,".length) * 0.75);
+      document.getElementById("meta").textContent =
+        `PNG · ${shot.naturalWidth || "…"}×${shot.naturalHeight || "…"} px · ~${(bytes / 1024).toFixed(0)} KB`;
+      const download = document.getElementById("download");
+      download.href = dataUrl;
+      download.style.display = "inline";
+    });
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>09 · Export JSON — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>09 · Export JSON</h1>
+    <p>Exporting graph data as JSON — including the current layout. <code>toJSON()</code> returns the same <code>{ nodes, links }</code> payload <code>setData</code> accepts, so exports round-trip: edit the graph, export, re-import.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <button id="btnExport" class="primary">Export current layout</button>
+      <button id="btnReload">Reload JSON into graph</button>
+      <button id="btnDownload">Download .json</button>
+    </div>
+    <pre class="json" id="output">// press “Export current layout” to serialize the graph</pre>
+    <p class="hint">The export carries live x/y positions. “Reload JSON into graph” pushes the edited payload back through <code>setData</code> — the graph keeps its exact shape instead of re-flowing.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "crystal" },
+      theme: { name: "midnight" },
+    });
+
+    graph.setData({
+      nodes: [
+        { id: "web", label: "Web", radius: 16, color: "#4f8ef7" },
+        { id: "api", label: "API", radius: 14, color: "#ff6b6b" },
+        { id: "auth", label: "Auth", radius: 10, color: "#4ecdc4" },
+        { id: "db", label: "DB", radius: 12, color: "#ffe66d" },
+        { id: "cache", label: "Cache", radius: 10, color: "#aa96da" },
+      ],
+      links: [
+        { source: "web", target: "api", width: 2 },
+        { source: "api", target: "auth" },
+        { source: "api", target: "db", width: 2 },
+        { source: "api", target: "cache", style: "dashed" },
+      ],
+    });
+    graph.fit(110);
+
+    const output = document.getElementById("output");
+    let lastJson = null;
+
+    document.getElementById("btnExport").addEventListener("click", () => {
+      lastJson = graph.toJSON();
+      output.textContent = JSON.stringify(lastJson, (key, value) =>
+        typeof value === "number" ? Math.round(value * 100) / 100 : value
+      , 2).slice(0, 20000);
+    });
+
+    document.getElementById("btnReload").addEventListener("click", () => {
+      if (!lastJson) {
+        output.textContent = "// export first, then reload";
+        return;
+      }
+      graph.setData(lastJson).fit(110);
+    });
+
+    document.getElementById("btnDownload").addEventListener("click", () => {
+      if (!lastJson) lastJson = graph.toJSON();
+      const blob = new Blob([JSON.stringify(lastJson, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "graphium-graph.json";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

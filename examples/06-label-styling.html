@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>06 · Label Styling — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>06 · Label Styling</h1>
+    <p>Label customization lives in the theme: <code>label.position</code>, <code>offset</code>, <code>size</code>, <code>color</code>, <code>font</code>, <code>weight</code>, <code>background</code>, <code>padding</code> and <code>radius</code>. Per-node text is set with <code>label</code> on the node options or the handle.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls" id="positionRow">
+      <span class="counts">position:</span>
+      <button class="chip active" data-position="above">above</button>
+      <button class="chip" data-position="below">below</button>
+      <button class="chip" data-position="center">center</button>
+    </div>
+    <div class="controls">
+      <button id="btnSize">Size 10 → 16</button>
+      <button id="btnPill">Background pill</button>
+      <button id="btnMono">Monospace font</button>
+      <button id="btnReset" class="primary">Reset</button>
+    </div>
+    <p class="hint">Every toggle calls <code>setTheme({ label: { … } })</code>, which merges over the current theme — only the touched keys change.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "crystal" },
+      theme: {
+        name: "light",
+        label: { enabled: true, position: "above", size: 11, offset: 6 },
+      },
+    });
+
+    const palette = ["#ff6b6b", "#4ecdc4", "#ffe66d", "#95e1d3", "#aa96da", "#fcbad3"];
+    graph.setData({
+      nodes: palette.map((color, i) => ({
+        id: `n${i}`,
+        label: `Node ${i + 1}`,
+        color,
+        radius: 18,
+        x: Math.cos((i / palette.length) * Math.PI * 2) * 170,
+        y: Math.sin((i / palette.length) * Math.PI * 2) * 170,
+      })),
+      links: palette.map((_, i) => ({ source: `n${i}`, target: `n${(i + 1) % palette.length}` })),
+    });
+    graph.fit(110);
+
+    const positionRow = document.getElementById("positionRow");
+    positionRow.addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-position]");
+      if (!chip) return;
+      graph.setTheme({ label: { position: chip.dataset.position } });
+      for (const other of positionRow.querySelectorAll("[data-position]")) {
+        other.classList.toggle("active", other === chip);
+      }
+    });
+
+    const btnSize = document.getElementById("btnSize");
+    btnSize.addEventListener("click", () => {
+      const big = btnSize.textContent.includes("16");
+      graph.setTheme({ label: { size: big ? 10 : 16 } });
+      btnSize.textContent = big ? "Size 10 → 16" : "Size 16 → 10";
+    });
+
+    const btnPill = document.getElementById("btnPill");
+    let pill = false;
+    btnPill.addEventListener("click", () => {
+      pill = !pill;
+      graph.setTheme({
+        label: pill
+          ? { background: "rgba(15, 18, 26, 0.82)", padding: [4, 8], radius: 6, color: "#f0f3f9" }
+          : { background: null },
+      });
+      btnPill.classList.toggle("primary", pill);
+    });
+
+    const btnMono = document.getElementById("btnMono");
+    let mono = false;
+    btnMono.addEventListener("click", () => {
+      mono = !mono;
+      graph.setTheme({ label: { font: mono ? "ui-monospace, Menlo, monospace" : "system-ui, sans-serif", weight: mono ? 600 : 400 } });
+      btnMono.classList.toggle("primary", mono);
+    });
+
+    document.getElementById("btnReset").addEventListener("click", () => {
+      graph.setTheme({ name: "light", label: { enabled: true, position: "above", size: 11, offset: 6, background: null, font: "system-ui, sans-serif", weight: 400 } });
+      pill = mono = false;
+      btnPill.classList.remove("primary");
+      btnMono.classList.remove("primary");
+      btnSize.textContent = "Size 10 → 16";
+      for (const other of positionRow.querySelectorAll("[data-position]")) {
+        other.classList.toggle("active", other.dataset.position === "above");
+      }
+    });
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

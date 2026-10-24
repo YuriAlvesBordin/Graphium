@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>05 · Event Handling — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>05 · Event Handling</h1>
+    <p>Handling clicks, hovers, drags, zooms and simulation events with enhanced payloads. Pointer payloads carry <code>nodeId</code>, <code>linkId</code>, screen and world coordinates in one object.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <span id="status" class="counts">subscribed to 8 events</span>
+      <span class="spacer"></span>
+      <button id="btnToggle">Pause simulation</button>
+      <button id="btnClear" class="primary">Clear log</button>
+    </div>
+    <div class="log" id="log"></div>
+    <p class="hint">Interact with the graph: click nodes and empty space, hover, drag a node with momentum, wheel-zoom, pan the background. The <code>sleep</code> / <code>wake</code> pair fires when the solver settles or is disturbed.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "midnight" },
+    });
+
+    graph.setData({
+      nodes: Array.from({ length: 24 }, (_, i) => ({ id: `n${i}`, label: `N${i}` })),
+      links: Array.from({ length: 30 }, (_, i) => ({
+        source: `n${i % 24}`,
+        target: `n${(i * 7 + 3) % 24}`,
+      })).filter((l) => l.source !== l.target),
+    });
+    graph.fit(70);
+
+    const logEl = document.getElementById("log");
+    const seen = new Map();
+    function log(type, detail) {
+      const now = performance.now();
+      // Throttle noisy streams (hover, drag, zoom, pan) to one line per 150 ms.
+      if (["hover", "drag", "zoom", "pan"].includes(type) && now - (seen.get(type) ?? -1e9) < 150) return;
+      seen.set(type, now);
+      const line = document.createElement("div");
+      const time = new Date().toLocaleTimeString([], { hour12: false });
+      line.innerHTML = `<span class="t">${time}</span> <b>${type}</b> ${detail}`;
+      logEl.prepend(line);
+      while (logEl.childElementCount > 60) logEl.lastChild.remove();
+    }
+
+    graph.on("click", (e) => {
+      if (e.nodeId !== undefined) log("click", `node '${e.nodeId}' at world ${Math.round(e.worldX)}, ${Math.round(e.worldY)}`);
+      else if (e.linkId !== undefined) log("click", `link '${e.linkId}'`);
+      else log("click", `background at world ${Math.round(e.worldX)}, ${Math.round(e.worldY)}`);
+    });
+    graph.on("dblclick", () => log("dblclick", "double click"));
+    graph.on("hover", (e) => {
+      if (e.nodeIndex >= 0) log("hover", `node '${e.nodeId}'`);
+      else if (e.linkIndex >= 0) log("hover", `link '${e.linkId}'`);
+      else log("hover", "nothing under cursor");
+    });
+    graph.on("drag", (e) => log("drag", `node '${e.nodeId}' → ${Math.round(e.worldX)}, ${Math.round(e.worldY)}`));
+    graph.on("dragend", (e) => log("dragend", `node '${e.nodeId}' released`));
+    graph.on("zoom", (e) => log("zoom", `camera at screen ${Math.round(e.screenX)}, ${Math.round(e.screenY)}`));
+    graph.on("pan", (e) => log("pan", `background → ${Math.round(e.worldX)}, ${Math.round(e.worldY)}`));
+    graph.on("sleep", () => log("sleep", "solver settled — CPU idle"));
+    graph.on("wake", () => log("wake", "solver woke up"));
+    graph.on("dataupdated", () => log("dataupdated", "graph data changed"));
+
+    const btnToggle = document.getElementById("btnToggle");
+    btnToggle.addEventListener("click", () => {
+      if (graph.running) {
+        graph.stop();
+        btnToggle.textContent = "Resume simulation";
+        log("stop", "run loop stopped by user");
+      } else {
+        graph.start();
+        btnToggle.textContent = "Pause simulation";
+        log("start", "run loop restarted by user");
+      }
+    });
+
+    document.getElementById("btnClear").addEventListener("click", () => (logEl.innerHTML = ""));
+    log("ready", "event log armed");
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>

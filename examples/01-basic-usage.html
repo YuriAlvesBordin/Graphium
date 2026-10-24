@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>01 · Basic Usage — Graphium Examples</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+  <header>
+    <a href="../index.html">← All examples</a>
+    <h1>01 · Basic Usage</h1>
+    <p>Creating a simple graph with nodes and links. Pass a container element, add nodes with <code>addNode</code>, connect them with <code>link</code>, and call <code>fit()</code> to frame the view.</p>
+  </header>
+  <main>
+    <div class="stage" id="stage"></div>
+    <div class="controls">
+      <span class="counts"><b id="countNodes">0</b> nodes · <b id="countLinks">0</b> links</span>
+      <span class="spacer"></span>
+      <button id="btnFit">Fit view</button>
+      <button id="btnShake" class="primary">Shake graph</button>
+    </div>
+    <p class="hint">Drag nodes with momentum, wheel-zoom, and click a node to focus it. The physics sleeps automatically once the graph settles.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script type="module">
+    import { Graphium } from "../dist/index.js";
+
+    const graph = Graphium.create({
+      container: document.getElementById("stage"),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: "silk" },
+      theme: { name: "midnight" },
+    });
+
+    graph
+      .addNode("alice", { label: "Alice" })
+      .addNode("bob", { label: "Bob" })
+      .addNode("carol", { label: "Carol" })
+      .addNode("dave", { label: "Dave" })
+      .addNode("erin", { label: "Erin" });
+
+    graph
+      .link("alice", "bob")
+      .link("alice", "carol")
+      .link("bob", "dave")
+      .link("carol", "dave")
+      .link("dave", "erin");
+
+    graph.fit(80);
+
+    document.getElementById("btnFit").addEventListener("click", () => graph.fit(80));
+    document.getElementById("btnShake").addEventListener("click", () => {
+      const model = graph.model;
+      for (let index = 0; index < model.nodeCount; index++) {
+        model.vx[index] += (Math.random() - 0.5) * 400;
+        model.vy[index] += (Math.random() - 0.5) * 400;
+      }
+      graph.reboot();
+    });
+
+    const countNodes = document.getElementById("countNodes");
+    const countLinks = document.getElementById("countLinks");
+    setInterval(() => {
+      countNodes.textContent = String(graph.nodeCount);
+      countLinks.textContent = String(graph.linkCount);
+    }, 300);
+
+    window.graph = graph;
+    window.__ready = true;
+  </script>
+</body>
+</html>
