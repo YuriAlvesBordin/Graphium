@@ -159,6 +159,19 @@ describe('InteractionBinder', () => {
     expect(model.state[0]).toBe(STATE_HOVER);
   });
 
+  it('should move the appearance revision so sleeping graphs repaint hover', () => {
+    const { model, events } = createBinder();
+    model.addNode('a', {});
+    model.addNode('b', {});
+    const base = model.appearanceRevision;
+    events.emit('hover', { nodeIndex: 0 });
+    expect(model.appearanceRevision).toBe(base + 1);
+    events.emit('hover', { nodeIndex: 0 });
+    expect(model.appearanceRevision).toBe(base + 1);
+    events.emit('hover', { nodeIndex: 1 });
+    expect(model.appearanceRevision).toBe(base + 2);
+  });
+
   it('should patch pointer options through setInteraction', () => {
     const { binder } = createBinder();
     binder.setInteraction({ wheelZoomSpeed: 2.5 });

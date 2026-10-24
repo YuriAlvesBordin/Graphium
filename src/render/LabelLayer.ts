@@ -80,6 +80,8 @@ export class LabelLayer {
     const height = camera.height;
     // camera dimensions are drawing-buffer pixels; DOM transforms are CSS pixels
     const dpr = this.container.clientWidth > 0 ? width / this.container.clientWidth : 1;
+    const cssWidth = width / dpr;
+    const cssHeight = height / dpr;
     for (let index = 0; index < model.nodeCount && used < MAX_LABELS; index++) {
       const label = model.nodeLabel[index];
       if (label === null || (model.flags[index] & (NODE_HIDDEN | NODE_DIM)) !== 0) {
@@ -87,7 +89,7 @@ export class LabelLayer {
       }
       const screenX = (camera.zoom * (model.x[index] - camera.x) + width * 0.5) / dpr;
       const screenY = (camera.zoom * (model.y[index] - camera.y) + height * 0.5) / dpr;
-      if (screenX < -margin || screenX > width + margin || screenY < -margin || screenY > height + margin) {
+      if (screenX < -margin || screenX > cssWidth + margin || screenY < -margin || screenY > cssHeight + margin) {
         continue;
       }
       const element = this.acquire(used++);

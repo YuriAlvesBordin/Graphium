@@ -141,5 +141,8 @@ export class InteractionBinder {
     if (index >= 0 && state[index] === STATE_NORMAL) {
       state[index] = STATE_HOVER;
     }
+    // The renderer derives hover styling from the state byte, so the dirty
+    // check needs the revision to move even while the simulation sleeps.
+    this.deps.model.appearanceRevision++;
   }
 }

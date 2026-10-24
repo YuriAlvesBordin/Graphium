@@ -251,6 +251,7 @@ describe('Graphium facade remaining branches', () => {
       static instances: Array<{ observe: jest.Mock; callback: () => void }> = [];
       callback: () => void;
       observe = jest.fn();
+      disconnect = jest.fn();
       constructor(callback: () => void) {
         this.callback = callback;
         (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver;
@@ -366,5 +367,39 @@ describe('Graphium default parameters and theme merge branches', () => {
     graph.setTheme({ label: { enabled: true } });
     expect(graph.labels.minZoom).toBe(0.3);
     graph.destroy();
+  });
+
+  it('should fail with a clear error when WebGL2 is unavailable', () => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = jest.fn(() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+    const host = createHost();
+    try {
+      expect(() => new Graphium({ container: host, autoStart: false, autoResize: false })).toThrow(/WebGL2/);
+      expect(host.querySelector('canvas')).toBeNull(); // the abandoned canvas is cleaned up
+    } finally {
+      HTMLCanvasElement.prototype.getContext = original;
+    }
+  });
+
+  it('should disconnect the resize observer on destroy', () => {
+    const observers: Array<{ disconnect: jest.Mock; observe: jest.Mock }> = [];
+    class StubResizeObserver {
+      disconnect = jest.fn();
+      observe = jest.fn();
+      unobserve = jest.fn();
+      constructor() {
+        observers.push(this);
+      }
+    }
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = StubResizeObserver;
+    try {
+      const graph = new Graphium({ container: createHost(), autoStart: false });
+      expect(observers).toHaveLength(1);
+      expect(observers[0].observe).toHaveBeenCalled();
+      graph.destroy();
+      expect(observers[0].disconnect).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver;
+    }
   });
 });

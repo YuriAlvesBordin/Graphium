@@ -58,6 +58,7 @@ export class Graphium {
   private readonly focusController: FocusController;
   private readonly viewport: ViewportController;
   private readonly binder: InteractionBinder;
+  private resizeObserver: ResizeObserver | null = null;
 
   constructor(options: GraphiumOptions = {}) {
     this.options = options;
@@ -73,6 +74,10 @@ export class Graphium {
     const canvas = options.canvas ?? (options.container ? createCanvasIn(options.container) : createCanvasIn(document.body));
     this.renderer = new Renderer(canvas, this.theme, options.renderer ?? {});
     this.renderer.setCamera(this.camera);
+    if (!this.renderer.gl) {
+      canvas.remove();
+      throw new Error('Graphium requires a browser with WebGL2 support.');
+    }
     this.atlas = new TextureAtlas(this.renderer.gl as WebGL2RenderingContext);
     this.renderer.setAtlas(this.atlas);
     this.atlas.onEvent = event => {
@@ -122,7 +127,8 @@ export class Graphium {
     });
     this.resize();
     if (typeof ResizeObserver !== 'undefined' && (options.autoResize ?? true)) {
-      new ResizeObserver(() => this.resize()).observe(canvas);
+      this.resizeObserver = new ResizeObserver(() => this.resize());
+      this.resizeObserver.observe(canvas);
     }
     if (options.autoStart ?? true) {
       this.start();
@@ -458,6 +464,8 @@ export class Graphium {
     }
     this.destroyed = true;
     this.running = false;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.loop.cancel();
     this.binder.destroy();
     this.labels.destroy();

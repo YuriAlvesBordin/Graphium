@@ -104,6 +104,18 @@ describe('LabelLayer', () => {
     expect(layer.container.childElementCount).toBe(0);
   });
 
+  it('should cull labels against CSS pixel bounds on HiDPI screens', () => {
+    const { layer, model, camera } = makeLayer();
+    Object.defineProperty(layer.container, 'clientWidth', { value: 400 });
+    Object.defineProperty(layer.container, 'clientHeight', { value: 200 });
+    camera.setViewport(800, 400); // drawing buffer twice the CSS size: dpr = 2
+    model.addNode('near', { x: 200, y: 0, label: 'Near' }); // CSS x 300, inside
+    model.addNode('far', { x: 600, y: 0, label: 'Far' }); // CSS x 500, beyond 440
+    layer.update();
+    expect(layer.container.childElementCount).toBe(1);
+    expect(layer.container.firstElementChild?.textContent).toBe('Near');
+  });
+
   it('should cap the pool at four hundred visible labels', () => {
     const { layer, model } = makeLayer();
     for (let i = 0; i < 450; i++) {

@@ -107,4 +107,35 @@ describe('SpatialHash', () => {
     const output = new Int32Array(count);
     expect(hash.queryRadius(0, 0, 100, output)).toBeGreaterThan(0);
   });
+
+  it('should grow the cell table when items spread over more cells than slots', () => {
+    // 16 * 4 = 64 table slots; 300 items in 300 distinct cells used to hang
+    // the probing loop once the table filled up.
+    const hash = new SpatialHash(16, 1);
+    const count = 300;
+    const x = new Float32Array(count);
+    const y = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      x[i] = i * 3;
+    }
+    hash.rebuild(x, y, count);
+    expect(hash.count).toBe(count);
+    const output = new Int32Array(4);
+    expect(hash.queryRadius(0, 0, 2, output)).toBe(1);
+  });
+
+  it('should keep rebuilding after repeated table growth', () => {
+    const hash = new SpatialHash(16, 1);
+    const count = 2000;
+    const x = new Float32Array(count);
+    const y = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      x[i] = i * 3;
+    }
+    hash.rebuild(x, y, count);
+    hash.rebuild(x, y, count);
+    expect(hash.count).toBe(count);
+    const output = new Int32Array(4);
+    expect(hash.queryRadius((count - 1) * 3, 0, 2, output)).toBe(1);
+  });
 });

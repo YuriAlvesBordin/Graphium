@@ -45,6 +45,13 @@ describe('PhysicsEngine', () => {
     expect(engine.options.damping).toBe(0.84);
   });
 
+  it('should reject unknown preset names with a readable error', () => {
+    expect(() => new PhysicsEngine(makeModel(), { preset: 'nope' as never })).toThrow(/unknown physics preset "nope".*silk, bouncy/);
+    const engine = new PhysicsEngine(makeModel());
+    expect(() => engine.setOptions({ preset: 'nope' as never })).toThrow(/unknown physics preset/);
+    expect(() => engine.usePreset('nope' as never)).toThrow(/unknown physics preset/);
+  });
+
   it('should merge setOptions over the live configuration', () => {
     const engine = new PhysicsEngine(makeModel());
     engine.setOptions({ repulsion: 2500 });

@@ -190,9 +190,31 @@ describe('TextureAtlas', () => {
     atlas.sweep();
     atlas.request('kept.png'); // marks kept as used again
     atlas.sweep(); // now dropped.png had no request since the last sweep
-    // Requesting the dropped url allocates a fresh slot; kept stays cached.
+    // Requesting the dropped url recycles its freed slot; kept stays cached.
     expect(atlas.request('kept.png')).toBe(0);
-    expect(atlas.request('dropped.png')).toBe(2);
+    expect(atlas.request('dropped.png')).toBe(1);
+  });
+
+  it('should keep accepting new images after the atlas filled up once', () => {
+    const atlas = new TextureAtlas(createFakeGL() as unknown as WebGL2RenderingContext, 128, 4);
+    for (let index = 0; index < 16; index++) {
+      atlas.request(`frame-${index}.png`);
+    }
+    expect(atlas.request('overflow.png')).toBe(-1);
+    atlas.sweep(); // marks everything unused
+    atlas.sweep(); // drops every entry and frees the slots
+    expect(atlas.request('fresh.png')).toBe(15);
+    expect(atlas.request('fresh2.png')).toBe(14);
+  });
+
+  it('should resolve loadAll when an image settles after its entry was swept', async () => {
+    const atlas = new TextureAtlas(createFakeGL() as unknown as WebGL2RenderingContext);
+    atlas.request('late.png');
+    atlas.sweep();
+    atlas.sweep(); // the entry is gone before the image finished loading
+    const settled = atlas.loadAll();
+    StubImage.instances[0].onload?.();
+    await expect(settled).resolves.toBeUndefined();
   });
 
   it('should upload only when the revision changed', () => {

@@ -187,6 +187,25 @@ describe('PointerController', () => {
     expect((model.flags[0] & NODE_DRAGGED) === 0).toBe(true);
   });
 
+  it('should still pick nodes through the linear scan before the physics hash exists', () => {
+    const harness = createHarness();
+    const { canvas, model, physics, events } = harness;
+    model.addNode('ghost', { x: 0, y: 0, radius: 40, hidden: true });
+    model.addNode('grab', { x: 0, y: 0, radius: 40 });
+    // No physicsHashRebuild and no step: the spatial hash is still empty.
+    expect(physics.hash.count).toBe(0);
+    const beginDrag = jest.spyOn(physics, 'beginDrag');
+    const clicks: Array<Record<string, unknown>> = [];
+    events.on('click', payload => clicks.push(payload as Record<string, unknown>));
+
+    canvas.fire('pointerdown', pointerEvent({ clientX: 500, clientY: 250 }));
+    expect(beginDrag).toHaveBeenCalledWith(1, 0, 0); // the hidden node is skipped
+    expect(model.state[1]).toBe(STATE_DRAGGING);
+    canvas.fire('pointerup', pointerEvent({ clientX: 500, clientY: 250 }));
+    expect(clicks.length).toBe(1);
+    expect(clicks[0].nodeId).toBe('grab');
+  });
+
   it('should emit a click when a node press never moves', () => {
     const harness = createHarness();
     const { canvas, model, events } = harness;

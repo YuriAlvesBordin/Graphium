@@ -58,6 +58,26 @@ export class SpatialHash {
     this.nodeCapacity = capacity;
   }
 
+  /** Grows the cell table so linear probing always has a free slot left. */
+  private ensureTable(items: number): void {
+    // Distinct cells never exceed the item count, so doubling the requested
+    // size keeps the load factor at or below one half and probing terminates.
+    const needed = items * 2;
+    if (needed <= this.tableCapacity) {
+      return;
+    }
+    let capacity = this.tableCapacity;
+    while (capacity < needed) {
+      capacity <<= 1;
+    }
+    this.tableCapacity = capacity;
+    this.mask = capacity - 1;
+    this.keyX = new Int32Array(capacity);
+    this.keyY = new Int32Array(capacity);
+    this.head = new Int32Array(capacity);
+    this.used = new Uint8Array(capacity);
+  }
+
   /** Clears every cell and prepares the grid for a new rebuild. */
   clear(): void {
     this.used.fill(0);
@@ -83,6 +103,7 @@ export class SpatialHash {
   /** Rebuilds the grid over the first count positions, skipping nodes whose masked bits are set. */
   rebuild(x: Float32Array | Float64Array, y: Float32Array | Float64Array, count: number, hidden?: Uint8Array, mask?: number): void {
     this.ensureCapacity(count);
+    this.ensureTable(count);
     this.clear();
     for (let index = 0; index < count; index++) {
       if (hidden && (hidden[index] & (mask ?? 0xff)) !== 0) {

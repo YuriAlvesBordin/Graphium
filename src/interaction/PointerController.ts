@@ -5,7 +5,7 @@
  * presses, and emits normalized event payloads.
  */
 
-import { GraphModel, NODE_DRAGGED, NODE_SELECTED, STATE_DRAGGING } from '../core/GraphModel.js';
+import { GraphModel, NODE_DRAGGED, NODE_HIDDEN, NODE_SELECTED, STATE_DRAGGING } from '../core/GraphModel.js';
 import type { PointerEventPayload } from '../core/types.js';
 import type { Emitter } from '../core/events.js';
 import { Camera } from '../render/Camera.js';
@@ -96,10 +96,33 @@ export class PointerController {
 
   /** Finds the topmost node under a world position. */
   private pickNode(worldX: number, worldY: number): number {
+    if (this.hash.count === 0) {
+      return this.scanNode(worldX, worldY);
+    }
     if (this.pickBuffer.length < this.model.nodeCount) {
       this.pickBuffer = new Int32Array(Math.max(256, this.model.nodeCount * 2));
     }
     return this.hash.pick(worldX, worldY, this.model.x, this.model.y, this.model.visualRadius, this.pickBuffer);
+  }
+
+  /** Linear fallback for before the physics loop built the spatial hash. */
+  private scanNode(worldX: number, worldY: number): number {
+    let best = -1;
+    let bestDistance = Infinity;
+    for (let index = 0; index < this.model.nodeCount; index++) {
+      if (this.model.flags[index] & NODE_HIDDEN) {
+        continue;
+      }
+      const dx = this.model.x[index] - worldX;
+      const dy = this.model.y[index] - worldY;
+      const distance = dx * dx + dy * dy;
+      const radius = this.model.visualRadius[index];
+      if (distance <= radius * radius && distance < bestDistance) {
+        best = index;
+        bestDistance = distance;
+      }
+    }
+    return best;
   }
 
   /** Resolves the link under a world position through the host callback. */

@@ -95,7 +95,7 @@ export class PhysicsEngine {
 
   /** Merges new physics values into the live configuration and wakes up. */
   setOptions(options: PhysicsOptions): void {
-    const presetValues = options.preset ? PRESETS[options.preset].values : {};
+    const presetValues = options.preset ? resolvePresetValues(options.preset) : {};
     const merged = { ...this.options, ...presetValues, ...options } as ResolvedPhysicsOptions;
     delete (merged as Partial<PhysicsOptions>).preset;
     this.options = merged;
@@ -555,8 +555,17 @@ function crossSign(ax: number, ay: number, bx: number, by: number, px: number, p
 
 /** Combines defaults, preset values and user overrides into one config. */
 function resolveOptions(options: PhysicsOptions): ResolvedPhysicsOptions {
-  const preset = options.preset ? PRESETS[options.preset].values : {};
+  const preset = options.preset ? resolvePresetValues(options.preset) : {};
   const merged = { ...DEFAULTS, ...preset, ...options } as ResolvedPhysicsOptions & PhysicsOptions;
   delete (merged as Partial<PhysicsOptions>).preset;
   return merged;
+}
+
+/** Resolves a preset name into its values, failing with a readable error. */
+function resolvePresetValues(name: keyof typeof PRESETS): PhysicsOptions {
+  const preset = PRESETS[name];
+  if (!preset) {
+    throw new Error(`Graphium: unknown physics preset "${String(name)}". Available presets: ${Object.keys(PRESETS).join(', ')}.`);
+  }
+  return preset.values;
 }

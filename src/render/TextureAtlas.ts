@@ -33,7 +33,9 @@ export class TextureAtlas {
   private context: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
   private entries = new Map<string, AtlasEntry>();
   private pending = new Set<string>();
+  private freeSlots: number[] = [];
   private nextSlot = 0;
+  private settleCallbacks: Array<() => void> = [];
   onEvent: ((event: AtlasEvent) => void) | null = null;
 
   constructor(gl: WebGL2RenderingContext, size = 1024, grid = 8) {
@@ -74,11 +76,19 @@ export class TextureAtlas {
       entry.mode = mode;
       return entry.slot;
     }
-    if (this.nextSlot >= this.maxSlots || typeof Image === 'undefined') {
+    if (typeof Image === 'undefined') {
+      return -1;
+    }
+    let slot: number;
+    if (this.freeSlots.length > 0) {
+      slot = this.freeSlots.pop() as number;
+    } else if (this.nextSlot < this.maxSlots) {
+      slot = this.nextSlot++;
+    } else {
       return -1;
     }
     const record: AtlasEntry = {
-      slot: this.nextSlot++,
+      slot,
       ready: false,
       failed: false,
       used: true,
@@ -90,12 +100,15 @@ export class TextureAtlas {
     const image = new Image();
     image.crossOrigin = 'anonymous';
     image.onload = () => {
-      if (!this.entries.has(url)) {
+      this.pending.delete(url);
+      this.notifySettled();
+      // The entry may have been swept or replaced while the image was in
+      // flight, and its slot may now belong to a different URL.
+      if (this.entries.get(url) !== record) {
         return;
       }
       record.ready = true;
       record.image = image;
-      this.pending.delete(url);
       this.drawEntry(record);
       this.loadedCount++;
       if (this.onEvent) {
@@ -103,8 +116,9 @@ export class TextureAtlas {
       }
     };
     image.onerror = () => {
-      record.failed = true;
       this.pending.delete(url);
+      this.notifySettled();
+      record.failed = true;
       if (this.onEvent) {
         this.onEvent({ type: 'imageerror', url, slot: record.slot });
       }
@@ -153,6 +167,7 @@ export class TextureAtlas {
     for (const [url, entry] of this.entries) {
       if (!entry.used) {
         this.entries.delete(url);
+        this.freeSlots.push(entry.slot);
       } else {
         entry.used = false;
       }
@@ -165,21 +180,24 @@ export class TextureAtlas {
       return Promise.resolve();
     }
     return new Promise(resolve => {
-      const check = () => {
+      this.settleCallbacks.push(() => {
         if (this.pending.size === 0) {
           resolve();
-          return true;
         }
-        return false;
-      };
-      const previous = this.onEvent;
-      this.onEvent = event => {
-        if (previous) {
-          previous(event);
-        }
-        check();
-      };
+      });
     });
+  }
+
+  /** Resolves loadAll waiters once the pending set drains. */
+  private notifySettled(): void {
+    if (this.pending.size > 0 || this.settleCallbacks.length === 0) {
+      return;
+    }
+    const callbacks = this.settleCallbacks;
+    this.settleCallbacks = [];
+    for (const callback of callbacks) {
+      callback();
+    }
   }
 
   /** Reports whether a URL finished loading successfully. */
