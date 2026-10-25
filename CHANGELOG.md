@@ -2,6 +2,11 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.2.2] - 2026-10-25
+
+### Fixed
+- `step()` now runs the `beforeRender` hooks like a scheduled frame does, so a manually stepped graph applies the camera constraint (`constrainToViewport`) on every step instead of only on animation-loop frames. Also restores the CI coverage gate: the drag-freeze branch was unreachable from tests because `step()`/`renderNow()` bypassed the hook
+
 ## [2.2.1] - 2026-10-24
 
 ### Fixed
