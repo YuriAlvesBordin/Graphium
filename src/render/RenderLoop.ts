@@ -55,6 +55,9 @@ export class RenderLoop {
   /** Advances physics and renders once, returning the kinetic energy. */
   step(dt = 1 / 60): number {
     const energy = this.deps.physics.step(dt);
+    // Um step manual é uma iteração de frame completa: os hooks de pré-render
+    // (ex.: confinamento de câmera) rodam como no loop agendado.
+    this.deps.beforeRender?.();
     this.renderFrame();
     return energy;
   }

@@ -209,7 +209,7 @@ describe('constrainToViewport integration', () => {
 
     // Ao soltar, o clamp da câmera volta a valer.
     canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 1200, clientY: 210 }));
-    graph.render();
+    graph.step(1 / 60);
     expect(graph.camera.x).toBeGreaterThanOrEqual(dragged + 20 - halfWidth);
 
     graph.destroy();
