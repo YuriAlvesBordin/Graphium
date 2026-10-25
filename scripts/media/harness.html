@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Graphium media capture harness</title>
+  <style>
+    html, body { margin: 0; background: #0b0e14; overflow: hidden; }
+    #stage { position: relative; width: 1200px; height: 700px; }
+    canvas { display: block; }
+    #inspector {
+      position: absolute; right: 14px; bottom: 14px; width: 230px; padding: 11px 13px;
+      background: rgba(17, 21, 30, 0.92); border: 1px solid #232a38; border-radius: 12px;
+      font: 12px/1.5 system-ui, sans-serif; color: #8b97ad; backdrop-filter: blur(10px); display: none;
+    }
+    #inspector .name { font-weight: 650; color: #f0f3f9; font-size: 13px; margin-bottom: 3px; }
+    #inspector .meta { display: flex; justify-content: space-between; }
+    #inspector .meta b { color: #d7deeb; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="inspector">
+      <div class="name" id="insName"></div>
+      <div class="meta"><span>Links</span><b id="insDegree"></b></div>
+      <div class="meta"><span>Position</span><b id="insPos"></b></div>
+      <div class="meta"><span>Velocity</span><b id="insVel"></b></div>
+    </div>
+  </div>
+  <script type="module">
+    import { Graphium } from '/dist/index.js';
+
+    window.__currentScene = 'idle';
+    window.__done = false;
+
+    const graph = Graphium.create({
+      container: document.getElementById('stage'),
+      autoStart: true,
+      autoFit: true,
+      physics: { preset: 'silk' },
+      theme: { name: 'midnight' },
+      camera: { minZoom: 0.05, maxZoom: 12 },
+    });
+
+    function rng(seed) {
+      let s = seed;
+      return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+    }
+
+    // monogram avatar tinted from a base color
+    function makeAvatar(baseColor, monogram) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const [r, g, b] = [1, 3, 5].map(i => parseInt(baseColor.slice(i, i + 2), 16));
+      const grad = ctx.createLinearGradient(0, 0, 128, 128);
+      grad.addColorStop(0, `rgb(${Math.min(255, r + 60)}, ${Math.min(255, g + 60)}, ${Math.min(255, b + 60)})`);
+      grad.addColorStop(1, `rgb(${Math.max(0, r - 40)}, ${Math.max(0, g - 40)}, ${Math.max(0, b - 40)})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.font = '700 50px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(monogram, 64, 68);
+      return canvas.toDataURL('image/png');
+    }
+
+    const PALETTE = ['#ff6b6b', '#4ecdc4', '#ffd166', '#95e1d3', '#aa96da', '#f78fb3', '#7ec8e3', '#c9b1ff'];
+
+    function ecosystem() {
+      const clusters = {
+        Frontend: ['React', 'Vue', 'Svelte', 'Vite', 'Tailwind', 'RxJS', 'Three.js'],
+        Backend: ['Node', 'Django', 'Rails', 'Go', 'Express', 'gRPC'],
+        Data: ['Postgres', 'Redis', 'Kafka', 'Spark', 'ClickHouse'],
+        Infra: ['Kubernetes', 'Docker', 'Terraform', 'AWS', 'NGINX'],
+        Tooling: ['TypeScript', 'ESLint', 'Jest', 'GitHub CI', 'Vitest'],
+      };
+      const nodes = [], links = [];
+      const rand = rng(11);
+      const anchors = Object.keys(clusters).map((_, i) => {
+        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+        return { x: Math.cos(angle) * 300, y: Math.sin(angle) * 260 };
+      });
+      let ci = 0;
+      for (const [cluster, members] of Object.entries(clusters)) {
+        const color = PALETTE[ci % PALETTE.length];
+        const anchor = anchors[ci];
+        members.forEach((name, m) => {
+          const spread = (m / members.length) * Math.PI * 2;
+          nodes.push({
+            id: name, label: name, color, radius: 7 + rand() * 4,
+            x: anchor.x + Math.cos(spread) * 70,
+            y: anchor.y + Math.sin(spread) * 60,
+          });
+        });
+        for (let m = 1; m < members.length; m++) {
+          links.push({ source: members[m], target: members[Math.floor(rand() * m)] });
+        }
+        ci++;
+      }
+      const bridges = [
+        ['TypeScript', 'React'], ['TypeScript', 'Node'], ['TypeScript', 'Vite'],
+        ['Vite', 'Jest'], ['Node', 'Express'], ['Node', 'Kafka'], ['Go', 'gRPC'],
+        ['Django', 'Postgres'], ['Rails', 'Redis'], ['Spark', 'ClickHouse'],
+        ['Kafka', 'Kubernetes'], ['NGINX', 'Kubernetes'], ['Terraform', 'AWS'],
+        ['GitHub CI', 'Docker'], ['Vitest', 'Vite'], ['ESLint', 'TypeScript'],
+        ['Three.js', 'React'], ['Tailwind', 'Vue'], ['gRPC', 'Kafka'], ['Jest', 'Vitest'],
+      ];
+      for (const [a, b] of bridges) links.push({ source: a, target: b, width: 1.4 });
+      return { nodes, links };
+    }
+
+    function clustersData(count) {
+      const nodes = [], links = [];
+      const rand = rng(42);
+      const per = Math.max(4, Math.round(count / 6));
+      for (let c = 0; c < 6; c++) {
+        for (let m = 0; m < per; m++) {
+          const id = `n${c}_${m}`;
+          const angle = (m / per) * Math.PI * 2 + c;
+          const dist = 110 + rand() * 60;
+          nodes.push({
+            id,
+            label: `${String.fromCharCode(65 + c)}${m}`,
+            x: Math.cos(angle) * dist + ((c % 3) - 1) * 320,
+            y: Math.sin(angle) * dist + (Math.floor(c / 3) - 0.5) * 320,
+            color: PALETTE[c % PALETTE.length],
+          });
+          if (m > 0) links.push({ source: id, target: `n${c}_${Math.floor(rand() * m)}` });
+        }
+        for (let e = 0; e < 3; e++) {
+          const a = `n${c}_${Math.floor(rand() * per)}`, b = `n${c}_${Math.floor(rand() * per)}`;
+          if (a !== b) links.push({ source: a, target: b });
+        }
+      }
+      for (let c = 0; c < 6; c++) links.push({ source: `n${c}_0`, target: `n${(c + 1) % 6}_0`, width: 1.8 });
+      return { nodes, links };
+    }
+
+    function networkData(count) {
+      const nodes = [], links = [];
+      const rand = rng(7);
+      for (let i = 0; i < count; i++) {
+        nodes.push({ id: `v${i}`, label: `V${i}`, radius: 6 + rand() * 3 });
+        if (i > 0) {
+          links.push({ source: `v${i}`, target: `v${Math.floor(Math.pow(rand(), 1.6) * i)}`, strength: 1.1 });
+          if (rand() > 0.72 && i > 3) links.push({ source: `v${i}`, target: `v${Math.floor(rand() * i)}` });
+        }
+      }
+      return { nodes, links };
+    }
+
+    function peopleData() {
+      const names = ['Ana', 'Bia', 'Caio', 'Duda', 'Eva', 'Fefe', 'Gus', 'Hana', 'Ivo', 'Juju', 'Kaka', 'Lila', 'Milo', 'Nina', 'Otto', 'Pipa', 'Rafa', 'Sasa', 'Titi', 'Uva', 'Val', 'Wanda', 'Xana', 'Yara', 'Zizo', 'Bruno', 'Carla', 'Diego', 'Elis', 'Fabio'];
+      const nodes = [], links = [];
+      const rand = rng(5);
+      for (let i = 0; i < names.length; i++) {
+        nodes.push({
+          id: names[i],
+          label: names[i],
+          color: PALETTE[i % 6],
+          radius: 13 + rand() * 5,
+        });
+        if (i > 0) {
+          links.push({ source: names[i], target: names[Math.floor(rand() * i)] });
+          if (rand() > 0.6) links.push({ source: names[i], target: names[Math.floor(rand() * i)] });
+        }
+      }
+      return { nodes, links };
+    }
+
+    function pipelineData() {
+      const layers = {
+        Sources: { color: '#4ecdc4', nodes: ['Events API', 'Webhooks', 'CSV Drop', 'Mobile SDK'] },
+        Ingest: { color: '#7ec8e3', nodes: ['Gateway', 'Validator', 'Enricher'] },
+        Store: { color: '#ffd166', nodes: ['Queue', 'Lake', 'Warehouse'] },
+        Process: { color: '#ff9f6b', nodes: ['Stream Job', 'Batch ETL', 'ML Scoring'] },
+        Serve: { color: '#f78fb3', nodes: ['Metrics', 'Search', 'Dashboards', 'Alerts'] },
+      };
+      const nodes = [], links = [];
+      const layerKeys = Object.keys(layers);
+      layerKeys.forEach((key, li) => {
+        const layer = layers[key];
+        const x = -480 + li * 240;
+        layer.nodes.forEach((n, ni) => {
+          const y = (ni - (layer.nodes.length - 1) / 2) * 110;
+          nodes.push({ id: n, label: n, color: layer.color, radius: 9, x, y });
+        });
+      });
+      const wire = (a, b) => links.push({ source: a, target: b, curvature: 0.25, width: 1.5 });
+      for (const s of layers.Sources.nodes) wire(s, 'Gateway');
+      wire('Events API', 'Validator'); wire('Webhooks', 'Validator');
+      for (const v of ['Gateway', 'Validator']) wire(v, 'Enricher');
+      wire('Enricher', 'Queue'); wire('Enricher', 'Lake');
+      wire('Queue', 'Stream Job'); wire('Lake', 'Batch ETL'); wire('Warehouse', 'ML Scoring');
+      wire('Batch ETL', 'Warehouse');
+      for (const p of ['Stream Job', 'Batch ETL', 'ML Scoring']) wire(p, 'Metrics');
+      wire('Stream Job', 'Alerts'); wire('ML Scoring', 'Dashboards');
+      wire('Warehouse', 'Search');
+      return { nodes, links };
+    }
+
+    function treeData(depth) {
+      const nodes = [], links = [];
+      const spread = Math.pow(2, depth);
+      let counter = 0, seedState = 3;
+      const jitter = () => { seedState = (seedState * 16807) % 2147483647; return ((seedState - 1) / 2147483646 - 0.5) * 2; };
+      const walk = (level, x, y, parent) => {
+        const id = `t${counter++}`;
+        nodes.push({ id, label: level > 4 ? null : `L${level}`, x: x + jitter() * 12, y: y + jitter() * 12, color: PALETTE[level % PALETTE.length], radius: 9 - level * 0.6 });
+        if (parent) links.push({ source: parent, target: id });
+        if (level < depth) {
+          const gap = spread / Math.pow(2, level + 1);
+          walk(level + 1, x - gap, y + 92, id);
+          walk(level + 1, x + gap, y + 92, id);
+        }
+      };
+      walk(0, 0, -260, null);
+      return { nodes, links };
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const MIDNIGHT = { name: 'midnight', edge: { opacity: 0.5, arrowEnabled: false }, label: { size: 12, weight: 600 } };
+
+    function hubIds(graph, count) {
+      const degree = {};
+      graph.toJSON().links.forEach(l => { degree[l.source] = (degree[l.source] || 0) + 1; degree[l.target] = (degree[l.target] || 0) + 1; });
+      return Object.entries(degree).sort((a, b) => b[1] - a[1]).slice(0, count).map(e => e[0]);
+    }
+
+    const scenarios = [
+      {
+        name: 'hero',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.45, curvature: 0.15, arrowEnabled: false }, label: { size: 13, weight: 650 } });
+          graph.setData(ecosystem());
+          graph.setPhysics({ edgeSeparation: 0.3, gravity: 0.006, repulsion: 1500 });
+          graph.fit(90);
+          await sleep(3000);
+          const hubs = hubIds(graph, 10);
+          hubs.forEach((h, i) => {
+            const color = graph.toJSON().nodes.find(n => n.id === h)?.color || '#4ecdc4';
+            graph.node(h).radius(15);
+            graph.setNodeImage(h, makeAvatar(typeof color === 'string' ? color : '#4ecdc4', h.slice(0, 2).toUpperCase()), 'cover');
+          });
+          await sleep(400);
+          graph.fit(80);
+          await sleep(1600); // window for page captures
+        },
+      },
+      {
+        name: 'physics',
+        async run() {
+          graph.setTheme(MIDNIGHT);
+          graph.setData(clustersData(120));
+          graph.setPhysics({ gravity: 0.004 });
+          graph.fit(70);
+          await sleep(2400);
+          const model = graph.model;
+          for (let i = 0; i < model.nodeCount; i++) {
+            model.vx[i] += (Math.random() - 0.5) * 320;
+            model.vy[i] += (Math.random() - 0.5) * 320;
+          }
+          graph.reboot();
+          await sleep(5000); // capture window: shake + reorganization
+        },
+      },
+      {
+        name: 'curved-edges',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.6, arrowEnabled: false }, label: { size: 11, weight: 600 } });
+          graph.setData(networkData(48));
+          graph.setPhysics({ edgeSeparation: 0.2 });
+          graph.fit(80);
+          await sleep(2600);
+          const model = graph.model;
+          const start = performance.now();
+          // sweep curvature over ~4.5s; captures happen from outside
+          while (performance.now() - start < 4500) {
+            const t = (performance.now() - start) / 4500;
+            const value = -0.55 * Math.cos(t * Math.PI * 2);
+            for (let k = 0; k < model.linkCount; k++) model.linkCurvature[k] = value;
+            graph.requestRender();
+            await sleep(16);
+          }
+        },
+      },
+      {
+        name: 'themes',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.45, arrowEnabled: false }, label: { size: 11, weight: 600 } });
+          graph.setData(clustersData(90));
+          graph.fit(80);
+          await sleep(2400);
+          for (const t of ['midnight', 'light', 'slate', 'sunset']) {
+            graph.setTheme({ name: t, edge: { opacity: 0.45, arrowEnabled: false }, label: { size: 11, weight: 600 } });
+            await sleep(1600);
+          }
+        },
+      },
+      {
+        name: 'node-images',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.45, arrowEnabled: false }, label: { size: 12, weight: 600 } });
+          const people = peopleData();
+          graph.setData(people);
+          graph.setPhysics({ repulsion: 1900 });
+          graph.fit(90);
+          await sleep(2200);
+          people.nodes.forEach((n, i) => graph.setNodeImage(n.id, makeAvatar(n.color, n.id.slice(0, 2).toUpperCase()), 'cover'));
+          await sleep(2600);
+        },
+      },
+      {
+        name: 'arrows',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.55, arrowEnabled: true, arrowSize: 1.5, arrowWidth: 1.2 }, label: { size: 12, weight: 600 } });
+          graph.setData(pipelineData());
+          graph.setPhysics({ edgeSeparation: 0.4, repulsion: 1400, gravity: 0.002 });
+          graph.fit(80);
+          await sleep(3600);
+          graph.fit(90);
+          await sleep(1000);
+        },
+      },
+      {
+        name: 'tree-layout',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.45, arrowEnabled: false }, label: { size: 11 } });
+          graph.setData(treeData(6));
+          graph.setPhysics({ edgeSeparation: 0 });
+          graph.fit(70);
+          await sleep(5600);
+        },
+      },
+      {
+        name: 'interaction',
+        async run() {
+          graph.setTheme({ name: 'midnight', edge: { opacity: 0.45, arrowEnabled: false }, label: { size: 11 } });
+          graph.setData(clustersData(100));
+          graph.fit(80);
+          await sleep(2600);
+          const hubs = hubIds(graph, 1);
+          const hubId = hubs[0];
+          const data = graph.toJSON();
+          const degree = {};
+          data.links.forEach(l => { degree[l.source] = (degree[l.source] || 0) + 1; degree[l.target] = (degree[l.target] || 0) + 1; });
+          document.getElementById('insName').textContent = String(data.nodes.find(n => n.id === hubId)?.label ?? hubId);
+          document.getElementById('insDegree').textContent = String(degree[hubId]);
+          document.getElementById('inspector').style.display = 'block';
+          graph.focus(hubId);
+          graph.fit(140);
+          const end = performance.now() + 3600;
+          while (performance.now() < end) {
+            const snap = graph.model.nodeSnapshot(graph.model.nodeIndexOf(hubId));
+            if (snap) {
+              document.getElementById('insPos').textContent = `${snap.x.toFixed(0)}, ${snap.y.toFixed(0)}`;
+              document.getElementById('insVel').textContent = `${snap.vx.toFixed(1)}, ${snap.vy.toFixed(1)}`;
+            }
+            await sleep(50);
+          }
+          document.getElementById('inspector').style.display = 'none';
+          graph.unfocus();
+        },
+      },
+    ];
+
+    for (const scene of scenarios) {
+      window.__currentScene = scene.name;
+      await scene.run();
+      await sleep(400);
+    }
+    window.__currentScene = 'done';
+    window.__done = true;
+  </script>
+</body>
+</html>

@@ -15,6 +15,21 @@
 
 ![Graphium hero](docs/assets/hero.png)
 
+**Everything you see here is rendered by the library itself** — force physics,
+curved edges, labels, node images, arrow heads, themes, and camera work. No
+mockups.
+
+## Highlights
+
+- WebGL2 batched renderer - thousands of nodes and edges at 60fps
+- Silk-smooth force physics with four presets and live tuning
+- GPU-computed curved edges and zoom-aware arrow heads
+- Node images via a texture atlas (URL or canvas data URL)
+- Four built-in themes, restylable and mergeable at runtime
+- Labels with per-node overrides (size, color, weight, background)
+- Click to focus with dimming, drag with momentum, wheel zoom
+- Events, PNG/JSON export, auto-sleep when the graph settles
+
 ## Installation
 
 ```bash
@@ -85,16 +100,16 @@ override only what you need.
 
 ### Node images
 
-Toggling node images on and off. Any node can take an image (URL or canvas
-data URL) rendered inside the circle with cover fit. Images upload to the GPU
-through a texture atlas, keeping draw calls minimal.
+People graph with monogram avatars fading in. Any node can take an image (URL
+or canvas data URL) rendered inside the circle with cover fit. Images upload
+to the GPU through a texture atlas, keeping draw calls minimal.
 
 ![Node images](docs/assets/node-images.gif)
 
 ### Arrow heads
 
-Turning directed arrow heads on. Arrows follow the edge path, respect
-curvature, and scale with zoom.
+A directed data pipeline. Arrows follow the edge path, respect curvature, and
+scale with zoom, so flow direction stays readable at any zoom level.
 
 ![Arrows](docs/assets/arrows.gif)
 
@@ -113,6 +128,16 @@ degree, position, and velocity. Dragging works with momentum, the wheel zooms,
 and every interaction emits events you can subscribe to.
 
 ![Interaction](docs/assets/interaction.gif)
+
+### Export and inspect
+
+Any graph can be captured or serialized without leaving the library - handy
+for thumbnails, reports, and debugging:
+
+```ts
+const png = graph.screenshot(); // PNG data URL of the current view
+const json = graph.toJSON();    // plain { nodes, links } object
+```
 
 ## Documentation
 
