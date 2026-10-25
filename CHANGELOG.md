@@ -2,6 +2,12 @@
 
 All notable changes to Graphium will be documented in this file.
 
+## [2.2.1] - 2026-10-24
+
+### Fixed
+- `constrainToViewport` no longer lets part of the content hang off the screen when the content fits the viewport: instead of confining the content center to the middle half of the view (which allowed up to half the content out of sight at the edges), the camera now slides the minimum needed to keep the entire content rectangle visible, and pans freely within the remaining slack
+- While a node drag is active the camera clamp is frozen, so the scene no longer slides under the cursor when dragging against an edge (the "elastic" feel); the clamp resumes right after the node is released
+
 ## [2.2.0] - 2026-10-24
 
 ### Added
