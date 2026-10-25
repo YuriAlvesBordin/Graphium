@@ -2,8 +2,6 @@
   <img src="docs/assets/logo.png" width="200" alt="Graphium logo" />
 </p>
 
-<h1 align="center">Graphium</h1>
-
 <p align="center">
   <a href="https://www.npmjs.com/package/@yurialvesbordin/graphium"><img src="https://img.shields.io/npm/v/@yurialvesbordin/graphium.svg" alt="npm version" /></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
