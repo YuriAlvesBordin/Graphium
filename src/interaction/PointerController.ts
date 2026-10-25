@@ -35,6 +35,11 @@ export class PointerController {
   options: Required<Omit<PointerOptions, 'pickLink'>> & Pick<PointerOptions, 'pickLink'>;
   enabled = false;
 
+  /** Whether a node drag is currently in progress. */
+  get isDragging(): boolean {
+    return this.dragNode >= 0;
+  }
+
   private element: HTMLElement;
   private camera: Camera;
   private model: GraphModel;

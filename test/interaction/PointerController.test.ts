@@ -519,3 +519,23 @@ describe('PointerController remaining branches', () => {
 function events_on(harness: { events: Emitter }, type: string, listener: (payload: unknown) => void): () => void {
   return harness.events.on(type, listener);
 }
+
+describe('PointerController drag state', () => {
+  it('should expose isDragging while a node drag is active', () => {
+    const { canvas, model, controller } = createHarness({ constrainDrag: true });
+    model.addNode('a', { x: 0, y: 0, radius: 20 });
+    expect(controller.isDragging).toBe(false);
+    canvas.fire('pointerdown', pointerEvent({ clientX: 500, clientY: 250 }));
+    expect(controller.isDragging).toBe(true);
+    canvas.fire('pointerup', pointerEvent({ clientX: 900, clientY: 250 }));
+    expect(controller.isDragging).toBe(false);
+  });
+
+  it('should stay not dragging when the press misses every node', () => {
+    const { canvas, model, controller } = createHarness();
+    model.addNode('a', { x: 0, y: 0, radius: 20 });
+    canvas.fire('pointerdown', pointerEvent({ clientX: 120, clientY: 460 }));
+    expect(controller.isDragging).toBe(false);
+    canvas.fire('pointerup', pointerEvent({ clientX: 120, clientY: 460 }));
+  });
+});

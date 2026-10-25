@@ -7,29 +7,31 @@ describe('Camera bounds', () => {
     // Nenhuma influência de estado entre testes.
   });
 
-  it('should keep small content visible when panning beyond the view', () => {
+  it('should keep the whole content visible when panning beyond the view', () => {
     const camera = new Camera({ zoom: 1 });
     camera.setViewport(viewport.width, viewport.height);
     camera.setBounds(100, 100, 300, 300);
 
-    // Conteúdo cabe na tela e a câmera já o mostra: posição preservada.
+    // Conteúdo cabe na tela: o clamp puxa a câmera o mínimo para o
+    // conteúdo inteiro ficar visível — em y o conteúdo estava saindo
+    // (viewport [-200, 200] contra conteúdo [100, 300]) e foi trazido.
     expect(camera.x).toBe(0);
-    expect(camera.y).toBe(0);
+    expect(camera.y).toBe(100);
 
-    // Pan permanece livre dentro de uma folga, mas não pode empurrar o
-    // conteúdo para fora da viewport: o centro do conteúdo fica confinado
-    // à metade central da tela (center 200 ± halfW 400 / halfH 200).
+    // Pan permanece livre dentro da folga, mas a câmera desliza o mínimo
+    // necessário para manter o conteúdo inteiro dentro da viewport:
+    // x ∈ [maxX - halfW, minX + halfW] = [-100, 500], y ∈ [100, 300].
     camera.pan(1000, 1000);
-    expect(camera.x).toBe(600);
-    expect(camera.y).toBe(400);
+    expect(camera.x).toBe(500);
+    expect(camera.y).toBe(300);
 
-    // O conteúdo continua intersectando a área visível.
+    // O conteúdo inteiro continua dentro da área visível.
     const viewLeft = camera.x - viewport.width / 2;
     const viewTop = camera.y - viewport.height / 2;
-    expect(viewLeft).toBeLessThanOrEqual(300);
-    expect(viewTop).toBeLessThanOrEqual(300);
-    expect(camera.x + viewport.width / 2).toBeGreaterThanOrEqual(100);
-    expect(camera.y + viewport.height / 2).toBeGreaterThanOrEqual(100);
+    expect(viewLeft).toBeLessThanOrEqual(100);
+    expect(viewTop).toBeLessThanOrEqual(100);
+    expect(camera.x + viewport.width / 2).toBeGreaterThanOrEqual(300);
+    expect(camera.y + viewport.height / 2).toBeGreaterThanOrEqual(300);
   });
 
   it('should clamp panning to the content edges when content is larger than the view', () => {

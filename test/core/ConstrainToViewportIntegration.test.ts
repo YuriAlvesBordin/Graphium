@@ -140,7 +140,7 @@ describe('constrainToViewport integration', () => {
     graph.destroy();
   });
 
-  it('should keep small content visible when the camera pans far away', () => {
+  it('should keep the whole content visible when the camera pans far away', () => {
     const graph = Graphium.create({
       container: createHost(),
       autoStart: false,
@@ -150,18 +150,67 @@ describe('constrainToViewport integration', () => {
     graph.addNode('a', { x: 100, y: 100, radius: 20 });
 
     // Conteúdo pequeno cabe na tela: o clamp não recentraliza por conta
-    // própria, mas se a câmera inicial já deixaria o nó fora da tela ela é
-    // puxada para dentro (centro do conteúdo confinado à metade central).
+    // própria, mas puxa a câmera o mínimo para nenhuma parte do conteúdo
+    // sair da viewport (bounds com raio: 80..120 em ambos os eixos).
     const halfWidth = graph.camera.width / graph.camera.zoom * 0.5;
     const halfHeight = graph.camera.height / graph.camera.zoom * 0.5;
-    expect(graph.camera.x).toBeCloseTo(0);
-    expect(graph.camera.y).toBeCloseTo(Math.max(0, 100 - halfHeight));
+    expect(graph.camera.x).toBeCloseTo(Math.max(120 - halfWidth, Math.min(80 + halfWidth, 0)));
+    expect(graph.camera.y).toBeCloseTo(Math.max(120 - halfHeight, Math.min(80 + halfHeight, 0)));
 
-    // Pan fica livre dentro de uma folga, mas o centro do conteúdo nunca
-    // sai da metade central da viewport — o grafo não pode ser perdido.
+    // Pan fica livre dentro da folga, mas a câmera desliza o mínimo para
+    // o conteúdo inteiro permanecer visível.
     graph.camera.pan(5000, 5000);
-    expect(graph.camera.x).toBeCloseTo(100 + halfWidth);
-    expect(graph.camera.y).toBeCloseTo(100 + halfHeight);
+    expect(graph.camera.x).toBeCloseTo(80 + halfWidth);
+    expect(graph.camera.y).toBeCloseTo(80 + halfHeight);
+
+    // Nenhuma parte do conteúdo ficou fora da viewport.
+    expect(graph.camera.x - halfWidth).toBeLessThanOrEqual(80);
+    expect(graph.camera.y - halfHeight).toBeLessThanOrEqual(80);
+    expect(graph.camera.x + halfWidth).toBeGreaterThanOrEqual(120);
+    expect(graph.camera.y + halfHeight).toBeGreaterThanOrEqual(120);
+
+    graph.destroy();
+  });
+
+  it('should keep the camera frozen while a node is dragged', () => {
+    const graph = Graphium.create({
+      container: createHost(),
+      autoStart: false,
+      constrainToViewport: true,
+    });
+
+    graph.addNode('a', { x: 0, y: 0, radius: 20 });
+    graph.render();
+
+    const canvas = graph.renderer.canvas;
+    canvas.setPointerCapture = () => {};
+    canvas.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 800, height: 400 }) as DOMRect;
+    const cameraBefore = { x: graph.camera.x, y: graph.camera.y };
+
+    // Pressiona o nó (world 0,0 => client 400,200) e arrasta para bem
+    // além da borda direita da viewport.
+    canvas.dispatchEvent(new MouseEvent('pointerdown', { clientX: 400, clientY: 200, button: 0 }));
+    canvas.dispatchEvent(new MouseEvent('pointermove', { clientX: 1200, clientY: 210 }));
+
+    // A câmera não reage aos bounds em movimento durante o arraste.
+    expect(graph.camera.x).toBeCloseTo(cameraBefore.x);
+    expect(graph.camera.y).toBeCloseTo(cameraBefore.y);
+
+    // O alvo do arraste foi preso ao retângulo visível: a física conduz o
+    // nó até a borda menos o raio — e não até a posição do ponteiro.
+    for (let i = 0; i < 120; i++) {
+      graph.step(1 / 60);
+    }
+    const halfWidth = graph.camera.width / graph.camera.zoom * 0.5;
+    const dragged = graph.model.x[graph.model.nodeIndexOf('a') as number];
+    expect(dragged).toBeCloseTo(graph.camera.x + halfWidth - 20);
+    expect(graph.camera.x).toBeCloseTo(cameraBefore.x);
+
+    // Ao soltar, o clamp da câmera volta a valer.
+    canvas.dispatchEvent(new MouseEvent('pointerup', { clientX: 1200, clientY: 210 }));
+    graph.render();
+    expect(graph.camera.x).toBeGreaterThanOrEqual(dragged + 20 - halfWidth);
 
     graph.destroy();
   });

@@ -411,6 +411,13 @@ export class Graphium {
       this.camera.clearBounds();
       return;
     }
+    // Durante o arraste de um nó a câmera fica parada: o alvo do arraste já
+    // é preso ao retângulo visível e reagir aos bounds em movimento dava a
+    // sensação de elástico — a cena deslizava sob o cursor. O clamp volta a
+    // valer no primeiro frame após soltar o nó.
+    if (this.binder.isDragging) {
+      return;
+    }
     const bounds = this.computeGraphBounds();
     if (!bounds) {
       this.camera.clearBounds();

@@ -491,11 +491,13 @@ const bounds = graph.camera.getBounds(); // { minX, minY, maxX, maxY } | null
 
 ### Clamping Behavior
 - When the bounded content is **larger** than the viewport, panning is limited so no empty area is shown beyond the content edges, at any zoom level.
-- When the content **fits** the viewport, panning stays free within a margin, but the content center is confined to the middle half of the viewport, so the content can never be pushed off screen entirely (at least half of it remains visible). Use `graph.fit()` or `graph.centerOn(x, y)` to center small content deliberately.
+- When the content **fits** the viewport, panning stays free within the slack, but the camera slides the minimum needed to keep the **entire** content rectangle inside the viewport — no part of the content can hang off an edge. The camera only moves when a content edge would actually leave the view; centering small content deliberately is still `graph.fit()` / `graph.centerOn(x, y)`.
 - Zooming (wheel and pinch) is anchored to the pointer position and re-clamped, so zooming never breaks containment.
 
 ### Dragging Nodes
 When `constrainToViewport` is enabled, node dragging is constrained too: the drag target is clamped to the visible world rectangle inset by the node's visual radius, so a node can never be dragged out of the visible canvas. A node whose radius exceeds half the viewport (very deep zoom) is held at the camera center.
+
+While a node drag is active the camera clamp is frozen — the scene does not slide under the cursor while you drag against an edge. The clamp resumes on the first frame after the node is released.
 
 Nodes pushed by the physics simulation are not clamped — while the graph is larger than the viewport they may move past the edge; pan to bring them back, knowing the camera clamp guarantees the content never disappears entirely.
 

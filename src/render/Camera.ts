@@ -67,21 +67,19 @@ export class Camera {
       // área vazia além dos extremos do conteúdo.
       this.x = Math.max(minX + halfWidth, Math.min(maxX - halfWidth, this.x));
     } else {
-      // O conteúdo cabe na tela: o pan continua livre, mas o centro do
-      // conteúdo nunca sai da metade central da viewport, então pelo menos
-      // metade dele permanece visível. Recentralizar por conta própria
-      // criaria um loop de feedback com bounds que acompanham os nós em
-      // movimento; centralizar é responsabilidade de fit()/centerOn().
-      const centerX = (minX + maxX) * 0.5;
-      this.x = Math.max(centerX - halfWidth, Math.min(centerX + halfWidth, this.x));
+      // O conteúdo cabe na tela: a câmera desliza o mínimo necessário para
+      // manter o conteúdo inteiro dentro da viewport — pan livre dentro da
+      // folga. Prender o centro à metade central da viewport deixava até
+      // metade do conteúdo fora da tela nas bordas. Não há loop de feedback:
+      // a câmera só se move quando uma borda do conteúdo ia sair.
+      this.x = Math.max(maxX - halfWidth, Math.min(minX + halfWidth, this.x));
     }
 
     const halfHeight = viewHeight * 0.5;
     if (maxY - minY > viewHeight) {
       this.y = Math.max(minY + halfHeight, Math.min(maxY - halfHeight, this.y));
     } else {
-      const centerY = (minY + maxY) * 0.5;
-      this.y = Math.max(centerY - halfHeight, Math.min(centerY + halfHeight, this.y));
+      this.y = Math.max(maxY - halfHeight, Math.min(minY + halfHeight, this.y));
     }
   }
 

@@ -38,6 +38,11 @@ export class InteractionBinder {
     this.wireEvents();
   }
 
+  /** Whether a node drag is currently in progress. */
+  get isDragging(): boolean {
+    return this.pointer?.isDragging ?? false;
+  }
+
   /** Updates interaction options on the live pointer controller. */
   setInteraction(options: InteractionOptions): void {
     if (this.pointer) {
